@@ -7,6 +7,6 @@ namespace SunBot
     class Configuration
     {
         public string BotToken { get; set; }
-        public string BotPrefix { get; set; }
+        public char BotPrefix { get; set; }
     }
 }

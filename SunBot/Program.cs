@@ -1,5 +1,7 @@
 ﻿using Discord;
+using Discord.Commands;
 using Discord.WebSocket;
+using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using System;
 using System.IO;
@@ -9,24 +11,36 @@ namespace SunBot
 {
     class Program
     {
-        public static void Main(string[] args) 
-            => new Program().MainAsync().GetAwaiter().GetResult();
+        public static void Main(string[] args) => new Program().MainAsync().GetAwaiter().GetResult();
 
-
-        private DiscordSocketClient _client;
         private Configuration _config;
 
         public async Task MainAsync()
         {
             _config = JsonConvert.DeserializeObject<Configuration>(File.ReadAllText("appsettings.json"));
 
-            _client = new DiscordSocketClient();
-            _client.Log += Log;
+            using (var services = ConfigureServices())
+            {
+                var client = services.GetRequiredService<DiscordSocketClient>();
+                client.Log += Log;
 
-            await _client.LoginAsync(TokenType.Bot, _config.BotToken);
-            await _client.StartAsync();
+                await client.LoginAsync(TokenType.Bot, _config.BotToken);
+                await client.StartAsync();
 
-            await Task.Delay(-1);
+                await services.GetRequiredService<CommandHandler>().InstallCommandsAsync();
+
+                await Task.Delay(-1);
+            }
+        }
+
+        private ServiceProvider ConfigureServices()
+        {
+            return new ServiceCollection()
+                .AddSingleton(_config)
+                .AddSingleton<DiscordSocketClient>()
+                .AddSingleton<CommandService>()
+                .AddSingleton<CommandHandler>()
+                .BuildServiceProvider();
         }
 
         private Task Log(LogMessage msg)

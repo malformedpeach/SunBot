@@ -20,10 +20,5 @@ namespace SunBot.Modules
 
             await ReplyAsync("foobar");
         }
-        // Banna folk
-
-        // Joina voice channel
-
-        // TTS
     }
 }

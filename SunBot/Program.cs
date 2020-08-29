@@ -2,10 +2,9 @@
 using Discord.Commands;
 using Discord.WebSocket;
 using Microsoft.Extensions.DependencyInjection;
-using Newtonsoft.Json;
 using System;
-using System.IO;
 using System.Threading.Tasks;
+using SunBot.Services;
 
 namespace SunBot
 {
@@ -13,18 +12,15 @@ namespace SunBot
     {
         public static void Main(string[] args) => new Program().MainAsync().GetAwaiter().GetResult();
 
-        private Configuration _config;
-
         public async Task MainAsync()
         {
-            _config = JsonConvert.DeserializeObject<Configuration>(File.ReadAllText("appsettings.json"));
-
             using (var services = ConfigureServices())
             {
+                var config = services.GetRequiredService<Configuration>();
                 var client = services.GetRequiredService<DiscordSocketClient>();
                 client.Log += Log;
 
-                await client.LoginAsync(TokenType.Bot, _config.BotToken);
+                await client.LoginAsync(TokenType.Bot, config.Bot.Token);
                 await client.StartAsync();
 
                 await services.GetRequiredService<CommandHandler>().InstallCommandsAsync();
@@ -36,7 +32,7 @@ namespace SunBot
         private ServiceProvider ConfigureServices()
         {
             return new ServiceCollection()
-                .AddSingleton(_config)
+                .AddSingleton<Configuration>()
                 .AddSingleton<DiscordSocketClient>()
                 .AddSingleton<CommandService>()
                 .AddSingleton<CommandHandler>()

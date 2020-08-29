@@ -7,7 +7,7 @@ using Discord.Commands;
 using Discord.WebSocket;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace SunBot
+namespace SunBot.Services
 {
     class CommandHandler
     {
@@ -38,7 +38,7 @@ namespace SunBot
 
             int argPos = 0;
 
-            if (!(message.HasCharPrefix(_config.BotPrefix, ref argPos) ||
+            if (!(message.HasCharPrefix(_config.Bot.Prefix, ref argPos) ||
                message.HasMentionPrefix(_client.CurrentUser, ref argPos)) ||
                message.Author.IsBot)
                return;

@@ -54,10 +54,7 @@ namespace SunBot.Modules
                  .AddField("Admin", "`ban`, `kick`, `clear`")
                  .WithFooter($"For more information use {_config.Bot.Prefix}help (command)");
 
-
             await ReplyAsync(embed: embed.Build());
         }
-
-        
     }
 }

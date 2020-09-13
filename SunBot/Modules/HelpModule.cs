@@ -74,7 +74,7 @@ namespace SunBot.Modules
             await ReplyAsync(embed: embed.Build());
         }
 
-        [Command("")]
+        [Command("clear")]
         [Summary("Info on command: \"clear\"")]
         public async Task HelpClearAsync()
         {

@@ -1,0 +1,2 @@
+# SunBot
+Discord bot

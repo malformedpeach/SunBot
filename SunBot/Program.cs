@@ -17,8 +17,11 @@ namespace SunBot
             using (var services = ConfigureServices())
             {
                 var config = services.GetRequiredService<Configuration>();
+                if (config.Bot == null) return;
+                
                 var client = services.GetRequiredService<DiscordSocketClient>();
                 client.Log += Log;
+
 
                 await client.LoginAsync(TokenType.Bot, config.Bot.Token);
                 await client.StartAsync();

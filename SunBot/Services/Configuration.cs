@@ -12,7 +12,17 @@ namespace SunBot.Services
 
         public Configuration()
         {
-            this.Bot = JsonConvert.DeserializeObject<Bot>(File.ReadAllText("appsettings.json"));
+            try
+            {
+                this.Bot = JsonConvert.DeserializeObject<Bot>(File.ReadAllText("appsettings.json"));
+            }
+            catch (Exception ex)
+            {
+                if (ex.InnerException.Message == "String must be exactly one character long.")
+                    Console.WriteLine("Configuration error: Please set your desired prefix in appsettings.json.");
+                else
+                    Console.WriteLine($"Configuration error: {ex.Message}");
+            }
         }
     }
 

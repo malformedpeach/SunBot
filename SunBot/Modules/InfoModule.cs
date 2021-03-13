@@ -33,22 +33,5 @@ namespace SunBot.Modules
         [Summary("Echoes a message.")]
         [Alias("echo")]
         public Task SayAsync([Remainder] [Summary("The text to echo")] string echo) => ReplyAsync(echo);
-
-        [Command("help")]
-        [Summary("Info on commands.")]
-        public async Task HelpAsync()
-        {
-            var embed = new EmbedBuilder
-            {
-                Title = "Bot Commands",
-                Description = $"The prefix of the bot is `{_config.Bot.Prefix}`",
-                Color = Color.Gold
-            };
-            embed.AddField("General", "`say`, `help`")
-                 .AddField("Admin", "`ban`, `kick`, `clear`")
-                 .WithFooter($"For more information use {_config.Bot.Prefix}help (command)");
-
-            await ReplyAsync(embed: embed.Build());
-        }
     }
 }

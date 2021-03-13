@@ -19,6 +19,25 @@ namespace SunBot.Modules
             _config = services.GetRequiredService<Configuration>();
         }
 
+        // Help Command
+        [Command("")]
+        [Summary("Info on commands.")]
+        public async Task HelpAsync()
+        {
+            //var embed = new EmbedBuilder
+            //{
+            //    Title = "Bot Commands",
+            //    Description = $"The prefix of the bot is `{_config.Bot.Prefix}`",
+            //    Color = Color.Gold
+            //};
+            //embed.AddField("General", "`say`, `help`")
+            //     .AddField("Admin", "`ban`, `kick`, `clear`")
+            //     .WithFooter($"For more information use: {_config.Bot.Prefix}help (command)");
+
+
+            await ReplyAsync("foobar"/*embed: embed.Build()*/);
+        }
+
         // Commands under InfoModule
         [Command("say")]
         [Summary("Info on command: \"say\"")]

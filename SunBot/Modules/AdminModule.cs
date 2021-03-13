@@ -41,8 +41,6 @@ namespace SunBot.Modules
             }
             else
             {
-                // Doesn't work, figure out why
-                // Solution: didn't work because i never authorized the bot to ban users. 
                 await Context.Guild.AddBanAsync(user: user, reason: banReason);
                 await ReplyAsync($"{user} banned for: {banReason ?? "No reason."}");
             }

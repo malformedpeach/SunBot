@@ -24,12 +24,6 @@ namespace SunBot.Modules
 
         public async Task AnnounceJoinedUser(SocketGuildUser user)
         {
-            //var embed = new EmbedBuilder
-            //{
-            //    Title = "Welcome!",
-            //    Description = $"Welcome to {user.Guild.Name}, {user}."
-            //};
-
             var channel = user.Guild.DefaultChannel;
 
             await channel.SendMessageAsync($"Welcome to {user.Guild.Name}, {user}");

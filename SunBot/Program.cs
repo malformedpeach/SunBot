@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Threading.Tasks;
 using SunBot.Services;
+using Discord.Audio;
 
 namespace SunBot
 {
@@ -22,7 +23,6 @@ namespace SunBot
                 var client = services.GetRequiredService<DiscordSocketClient>();
                 client.Log += Log;
 
-
                 await client.LoginAsync(TokenType.Bot, config.Bot.Token);
                 await client.StartAsync();
 
@@ -35,6 +35,7 @@ namespace SunBot
         private ServiceProvider ConfigureServices()
         {
             return new ServiceCollection()
+                .AddSingleton<AudioService>()
                 .AddSingleton<Configuration>()
                 .AddSingleton<DiscordSocketClient>()
                 .AddSingleton<CommandService>()

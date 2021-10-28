@@ -3,8 +3,6 @@ using Discord.Commands;
 using Microsoft.Extensions.DependencyInjection;
 using SunBot.Services;
 using System;
-using System.Collections.Generic;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace SunBot.Modules
@@ -13,10 +11,12 @@ namespace SunBot.Modules
     public class HelpModule : ModuleBase<SocketCommandContext>
     {
         private Configuration _config;
+        private CommandService _commandService;
 
         public HelpModule(IServiceProvider services)
         {
             _config = services.GetRequiredService<Configuration>();
+            _commandService = services.GetRequiredService<CommandService>();
         }
 
         // Help Command
@@ -24,18 +24,24 @@ namespace SunBot.Modules
         [Summary("Info on commands.")]
         public async Task HelpAsync()
         {
-            //var embed = new EmbedBuilder
-            //{
-            //    Title = "Bot Commands",
-            //    Description = $"The prefix of the bot is `{_config.Bot.Prefix}`",
-            //    Color = Color.Gold
-            //};
-            //embed.AddField("General", "`say`, `help`")
-            //     .AddField("Admin", "`ban`, `kick`, `clear`")
-            //     .WithFooter($"For more information use: {_config.Bot.Prefix}help (command)");
+            var commands = _commandService.Commands;
 
+            var embed = new EmbedBuilder
+            {
+                Title = "Bot Commands",
+                Description = $"The prefix of the bot is {_config.Bot.Prefix}",
+                Color = Color.Gold
+            };
 
-            await ReplyAsync("foobar"/*embed: embed.Build()*/);
+            foreach (var command in commands)
+            {
+                if (string.IsNullOrEmpty(command.Name)) continue;
+
+                embed.AddField("Title", command.Name);
+                embed.AddField("Description", command.Summary);
+            };
+             
+            await ReplyAsync(embed: embed.Build());
         }
 
         // Commands under InfoModule

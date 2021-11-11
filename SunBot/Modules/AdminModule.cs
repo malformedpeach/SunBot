@@ -22,7 +22,7 @@ namespace SunBot.Modules
         }
 
         [Command("ban")]
-        [Summary("Bans a specified user")]
+        [Summary("Ban a specified user")]
         [Alias("banuser")]
         [RequireUserPermission(GuildPermission.Administrator)]
         public async Task BanUserAsync([Summary("User to ban")] SocketGuildUser user = null, [Remainder][Summary("Reason for ban")]string banReason = null)
@@ -47,7 +47,7 @@ namespace SunBot.Modules
         }
 
         [Command("kick")]
-        [Summary("Kicks a specified user")]
+        [Summary("Kick a specified user")]
         [Alias("kickuser")]
         [RequireUserPermission(GuildPermission.Administrator)]
         public async Task KickUserAsync([Summary("User to kick")] SocketGuildUser user = null, [Remainder][Summary("Reason for kick")]string kickReason = null)
@@ -72,7 +72,7 @@ namespace SunBot.Modules
         }
 
         [Command("clear")]
-        [Summary("Clears a specified amount of messages from a text channel")]
+        [Summary("Clear a specified amount of message from a text channel")]
         [Alias("purge")]
         [RequireUserPermission(GuildPermission.Administrator)]
         public async Task ClearChannelAsync([Summary("Amount of messages to clear")]int amount)

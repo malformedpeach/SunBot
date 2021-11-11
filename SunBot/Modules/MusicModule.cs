@@ -14,27 +14,39 @@ namespace SunBot.Modules
 {
     public class MusicModule : ModuleBase<SocketCommandContext>
     {
-        public AudioService _service { get; set; }
+        public AudioService Service { get; set; }
 
 
         [Command("join", RunMode = RunMode.Async)]
         public async Task JoinAsync()
         {
             var channel = (Context.User as IGuildUser)?.VoiceChannel;
-            await _service.JoinVoiceChannelAsync(channel);
+            var connected = await Service.JoinVoiceChannelAsync(channel);
+
+            // TODO fix messages
+            if (connected) await ReplyAsync($"Joined {channel.Name}.");
+            else await ReplyAsync($"Could not join channel.");
         }
 
         [Command("leave", RunMode = RunMode.Async)]
         public async Task LeaveAsync()
         {
             var channel = (Context.User as IGuildUser)?.VoiceChannel;
-            await _service.LeaveVoiceChannelAsync(channel);
+            await Service.LeaveVoiceChannelAsync(channel);
         }
 
         [Command("play", RunMode = RunMode.Async)]
-        public async Task PlayAsync(string songUrl)
+        public async Task PlayAsync(string songUrl = "")
         {
-            await _service.PlaySongAsync(songUrl);
+            //var channel = (Context.User as IGuildUser)?.VoiceChannel;
+            await Service.EnqueueSongAsync(songUrl);
+        }
+
+        [Command("stop", RunMode = RunMode.Async)]
+        public async Task StopAsync()
+        {
+            //var channel = (Context.User as IGuildUser)?.VoiceChannel;
+            Service.StopSongAsync();
         }
     }
 }

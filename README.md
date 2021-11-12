@@ -1,5 +1,2 @@
 # SunBot
-Discord bot
-
-NAudio
-YoutubeExplode
+A friendly disco(rd) bot

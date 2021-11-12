@@ -44,17 +44,24 @@ namespace SunBot.Modules
             await ReplyAsync(embed: resultMessage);
         }
 
-        [Command("skip", RunMode = RunMode.Async)]
-        public async Task SkipAsync()
-        {
-            // Here next my man
-        }
-
         [Command("stop", RunMode = RunMode.Async)]
         public async Task StopAsync()
         {
-            //var channel = (Context.User as IGuildUser)?.VoiceChannel;
-            Service.StopSongAsync();
+            await Service.StopSongAsync();
         }
+        
+        [Command("skip", RunMode = RunMode.Async)]
+        public async Task SkipAsync()
+        {
+            await Service.SkipSongAsync();
+        }
+
+        [Command("queue", RunMode = RunMode.Async)]
+        public async Task QueueAsync()
+        {
+            var resultEmbed = Service.GetCurrentQueue();
+            await ReplyAsync(embed: resultEmbed);
+        }
+
     }
 }

@@ -20,6 +20,7 @@ namespace SunBot.Services
         private MediaFoundationReader _mediaReader;
         private AudioOutStream _outputStream;
         private Queue<Song> _songQueue = new Queue<Song>();
+        private Song _currentSong;
         private bool _playing = false;
         private ISocketMessageChannel _responseChannel;
 
@@ -31,7 +32,7 @@ namespace SunBot.Services
             if (voiceChannel == null)
             {
                 embed.Description = "Could not join channel.";
-                embed.Color = Color.DarkRed;
+                embed.Color = Color.Red;
 
                 return embed.Build();
             }
@@ -61,48 +62,89 @@ namespace SunBot.Services
                 }
             }
 
-            if(string.IsNullOrEmpty(songUrl) && _songQueue.Count > 0)
-            {
-                _playing = true; // Wonky af? rework this
-                await PlaySongAsync();
-            }
-            else if(_playing)
+
+            if (_playing)
             {
                 Song song = await GetHighestBitrateUrlAsync(songUrl);
                 _songQueue.Enqueue(song);
 
                 embed.Description = $"Queued: [{song.Title}]({song.OriginalUrl})";
-                embed.Color = Color.DarkGreen;
+                embed.Color = Color.Green;
 
                 return embed.Build();
             }
-            else if(!string.IsNullOrEmpty(songUrl) && _songQueue.Count == 0)
+            else if (!string.IsNullOrEmpty(songUrl) && _songQueue.Count == 0)
             {
                 _playing = true; // Wonky af? rework this
                 Song song = await GetHighestBitrateUrlAsync(songUrl);
                 _songQueue.Enqueue(song);
-                
+
+                await PlaySongAsync();
+            }
+            else if (string.IsNullOrEmpty(songUrl) && _songQueue.Count > 0)
+            {
+                _playing = true; // Wonky af? rework this
                 await PlaySongAsync();
             }
 
-            embed.Description = "No more songs in queue.";
-            embed.Color = Color.DarkRed;
+
+            // Check if zero. If user stops playback we don't want to show the 'no more songs' message.
+            if (_songQueue.Count == 0)
+            {
+                _playing = false;
+                embed.Description = "No more songs in queue.";
+                embed.Color = Color.Red;
+            }
 
             return embed.Build();
         }
         
-        public void StopSongAsync()
+        public async Task StopSongAsync()
         {
-            // TODO: Error handling, already disposed?
-
             _playing = false;
-            _outputStream.Dispose();
-            _mediaReader.Dispose();
+
+            if (_outputStream != null) await _outputStream.DisposeAsync();
+            if (_mediaReader != null) await _mediaReader.DisposeAsync();
         }
 
-        public void SkipSongAsync()
+        public async Task SkipSongAsync()
         {
-            // Here next my man
+            var embed = new EmbedBuilder
+            {
+                Description = $"Skipping: [{_currentSong.Title}]({_currentSong.OriginalUrl})",
+                Color = Color.Red
+            };
+            await _responseChannel.SendMessageAsync(embed: embed.Build());
+
+            if (_outputStream != null) await _outputStream.DisposeAsync();
+            if (_mediaReader != null) await _mediaReader.DisposeAsync();
+        }
+
+        public Embed GetCurrentQueue()
+        {
+            var embed = new EmbedBuilder();
+
+            if (_songQueue.Count == 0)
+            {
+                embed.Description = "Queue is empty.";
+                embed.Color = Color.Red;
+            }
+            else
+            {
+                var builder = new StringBuilder();
+                var currentQueue = _songQueue.ToArray();
+                builder.AppendLine($"Currently playing: [{_currentSong.Title}]({_currentSong.OriginalUrl})");
+
+                for (int i = 0; i < currentQueue.Length; i++)
+                {
+                    builder.AppendLine($"{i + 1}. [{currentQueue[i].Title}]({currentQueue[i].OriginalUrl})");
+                }
+
+                embed.Description = builder.ToString();
+                embed.Color = Color.Green;
+            }
+
+            return embed.Build();
         }
 
         private async Task<Song> GetHighestBitrateUrlAsync(string songUrl)
@@ -127,20 +169,19 @@ namespace SunBot.Services
         
         private async Task PlaySongAsync()
         {
-            #region Loop this sucka?
-            while(_songQueue.Count > 0)
+            while (_songQueue.Count > 0 && _playing)
             {
-                Song currentSong = _songQueue.Dequeue();
+                _currentSong = _songQueue.Dequeue();
 
-                _mediaReader = new MediaFoundationReader(currentSong.AudioUrl);
+                _mediaReader = new MediaFoundationReader(_currentSong.AudioUrl);
                 _outputStream = _audioClient.CreatePCMStream(AudioApplication.Music);
-                
+
                 try
                 {
                     var embed = new EmbedBuilder
                     {
-                        Description = $"Now playing: [{currentSong.Title}]({currentSong.OriginalUrl})",
-                        Color = Color.DarkGreen
+                        Description = $"Now playing: [{_currentSong.Title}]({_currentSong.OriginalUrl})",
+                        Color = Color.Green
                     };
                     await _responseChannel.SendMessageAsync(embed: embed.Build());
 
@@ -149,47 +190,16 @@ namespace SunBot.Services
                     await _outputStream.FlushAsync();
                     await _audioClient.SetSpeakingAsync(false);
 
-                    _mediaReader.Dispose();
-                    _outputStream.Dispose();
+                    await _mediaReader.DisposeAsync();
+                    await _outputStream.DisposeAsync();
                 }
-                catch (OperationCanceledException)
+                catch (Exception e)
                 {
-                    // TODO: Cancelled message for user.
-                    Console.WriteLine("Canceled!");
-                    _playing = false;
-                    continue;
+                    Console.WriteLine($"AudioService.PlaySongAsync: {e.Message}");
                 }
             }
-            #endregion
-
-            #region Recursion probs bad idea, stackoverflow inc
-            //_mediaReader = new MediaFoundationReader(_songQueue.Dequeue());
-            //_outputStream = _audioClient.CreatePCMStream(AudioApplication.Music);
-
-            //try
-            //{
-            //    await _audioClient.SetSpeakingAsync(true);
-            //    await _mediaReader.CopyToAsync(_outputStream);
-            //    await _outputStream.FlushAsync();
-            //    await _audioClient.SetSpeakingAsync(false);
-
-            //    _mediaReader.Dispose();
-            //    _outputStream.Dispose();
-            //}
-            //catch (OperationCanceledException)
-            //{
-            //    // TODO: Canceled message to channel
-            //    Console.WriteLine("Canceled");
-            //}
-            //finally
-            //{
-            //    if (_songQueue.Count > 0) await PlaySongAsync();
-            //    else if (_songQueue.Count == 0) _playing = false;
-            //}
-            #endregion
         }
     }
-
 
     public class Song
     {

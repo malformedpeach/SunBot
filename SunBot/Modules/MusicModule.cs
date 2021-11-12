@@ -20,12 +20,11 @@ namespace SunBot.Modules
         [Command("join", RunMode = RunMode.Async)]
         public async Task JoinAsync()
         {
-            var channel = (Context.User as IGuildUser)?.VoiceChannel;
-            var connected = await Service.JoinVoiceChannelAsync(channel);
-
-            // TODO fix messages
-            if (connected) await ReplyAsync($"Joined {channel.Name}.");
-            else await ReplyAsync($"Could not join channel.");
+            var voiceChannel = (Context.User as IGuildUser)?.VoiceChannel;
+            var textChannel = Context.Message.Channel;
+            
+            var resultEmbed = await Service.JoinVoiceChannelAsync(voiceChannel, textChannel);
+            if (resultEmbed.Description != string.Empty) await ReplyAsync(embed: resultEmbed);
         }
 
         [Command("leave", RunMode = RunMode.Async)]
@@ -38,8 +37,17 @@ namespace SunBot.Modules
         [Command("play", RunMode = RunMode.Async)]
         public async Task PlayAsync(string songUrl = "")
         {
-            //var channel = (Context.User as IGuildUser)?.VoiceChannel;
-            await Service.EnqueueSongAsync(songUrl);
+            var voiceChannel = (Context.User as IGuildUser)?.VoiceChannel;
+            var textChannel = Context.Message.Channel;
+
+            var resultMessage = await Service.EnqueueSongAsync(voiceChannel, textChannel, songUrl);
+            await ReplyAsync(embed: resultMessage);
+        }
+
+        [Command("skip", RunMode = RunMode.Async)]
+        public async Task SkipAsync()
+        {
+            // Here next my man
         }
 
         [Command("stop", RunMode = RunMode.Async)]

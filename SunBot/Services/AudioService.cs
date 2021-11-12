@@ -1,5 +1,7 @@
 ﻿using Discord;
 using Discord.Audio;
+using Discord.Commands;
+using Discord.WebSocket;
 using NAudio.Wave;
 using System;
 using System.Collections.Generic;
@@ -17,16 +19,26 @@ namespace SunBot.Services
         private IAudioClient _audioClient;
         private MediaFoundationReader _mediaReader;
         private AudioOutStream _outputStream;
-        private Queue<string> _songQueue = new Queue<string>();
+        private Queue<Song> _songQueue = new Queue<Song>();
         private bool _playing = false;
+        private ISocketMessageChannel _responseChannel;
 
-        public async Task<bool> JoinVoiceChannelAsync(IVoiceChannel channel) 
+        public async Task<Embed> JoinVoiceChannelAsync(IVoiceChannel voiceChannel, ISocketMessageChannel textChannel) 
         {
-            if (channel == null) return false;
+            _responseChannel = textChannel; // I think i'm cool with this
+            var embed = new EmbedBuilder();
+
+            if (voiceChannel == null)
+            {
+                embed.Description = "Could not join channel.";
+                embed.Color = Color.DarkRed;
+
+                return embed.Build();
+            }
             else
             {
-                _audioClient = await channel.ConnectAsync();
-                return true;
+                _audioClient = await voiceChannel.ConnectAsync();
+                return embed.Build();
             }
         }
 
@@ -34,32 +46,51 @@ namespace SunBot.Services
         {
             await channel.DisconnectAsync();
         }
-
-        public async Task EnqueueSongAsync(string songUrl = "")
+        
+        public async Task<Embed> EnqueueSongAsync(IVoiceChannel voiceChannel, ISocketMessageChannel textChannel, string songUrl = "")
         {
-            if (_audioClient == null) return; // Not connected to channel
+            var embed = new EmbedBuilder();
+
+            if (_audioClient == null)
+            {
+                var resultMessage =  await JoinVoiceChannelAsync(voiceChannel, textChannel);
+
+                if (!string.IsNullOrEmpty(resultMessage.Description))
+                {
+                    return resultMessage;
+                }
+            }
 
             if(string.IsNullOrEmpty(songUrl) && _songQueue.Count > 0)
             {
-                // Wonky af? rework this
-                _playing = true;
+                _playing = true; // Wonky af? rework this
                 await PlaySongAsync();
             }
             else if(_playing)
             {
-                var url = await GetHighestBitrateUrlAsync(songUrl);
-                _songQueue.Enqueue(url);
+                Song song = await GetHighestBitrateUrlAsync(songUrl);
+                _songQueue.Enqueue(song);
+
+                embed.Description = $"Queued: [{song.Title}]({song.OriginalUrl})";
+                embed.Color = Color.DarkGreen;
+
+                return embed.Build();
             }
             else if(!string.IsNullOrEmpty(songUrl) && _songQueue.Count == 0)
             {
-                // Wonky af? rework this
-                _playing = true;
-                var url = await GetHighestBitrateUrlAsync(songUrl);
-                _songQueue.Enqueue(url);
+                _playing = true; // Wonky af? rework this
+                Song song = await GetHighestBitrateUrlAsync(songUrl);
+                _songQueue.Enqueue(song);
+                
                 await PlaySongAsync();
             }
-        }
 
+            embed.Description = "No more songs in queue.";
+            embed.Color = Color.DarkRed;
+
+            return embed.Build();
+        }
+        
         public void StopSongAsync()
         {
             // TODO: Error handling, already disposed?
@@ -69,29 +100,50 @@ namespace SunBot.Services
             _mediaReader.Dispose();
         }
 
-
-        private async Task<string> GetHighestBitrateUrlAsync(string songUrl)
+        public void SkipSongAsync()
         {
-            // TODO: Error handling?
+            // Here next my man
+        }
+
+        private async Task<Song> GetHighestBitrateUrlAsync(string songUrl)
+        {
+            // TODO: Error handling? Rename method to something more fitting.
             var youtube = new YoutubeClient();
 
             var video = await youtube.Videos.GetAsync(songUrl);
 
             var streamManifest = await youtube.Videos.Streams.GetManifestAsync(video.Id);
             var streamInfo = streamManifest.GetAudioOnlyStreams().GetWithHighestBitrate();
-            return streamInfo.Url;
-        }
 
+            Song song = new Song
+            {
+                Title = video.Title,
+                AudioUrl = streamInfo.Url,
+                OriginalUrl = songUrl,
+            };
+            
+            return song;
+        }
+        
         private async Task PlaySongAsync()
         {
             #region Loop this sucka?
             while(_songQueue.Count > 0)
             {
-                _mediaReader = new MediaFoundationReader(_songQueue.Dequeue());
+                Song currentSong = _songQueue.Dequeue();
+
+                _mediaReader = new MediaFoundationReader(currentSong.AudioUrl);
                 _outputStream = _audioClient.CreatePCMStream(AudioApplication.Music);
                 
                 try
                 {
+                    var embed = new EmbedBuilder
+                    {
+                        Description = $"Now playing: [{currentSong.Title}]({currentSong.OriginalUrl})",
+                        Color = Color.DarkGreen
+                    };
+                    await _responseChannel.SendMessageAsync(embed: embed.Build());
+
                     await _audioClient.SetSpeakingAsync(true);
                     await _mediaReader.CopyToAsync(_outputStream);
                     await _outputStream.FlushAsync();
@@ -105,7 +157,7 @@ namespace SunBot.Services
                     // TODO: Cancelled message for user.
                     Console.WriteLine("Canceled!");
                     _playing = false;
-                    continue; // break loop
+                    continue;
                 }
             }
             #endregion
@@ -136,5 +188,13 @@ namespace SunBot.Services
             //}
             #endregion
         }
+    }
+
+
+    public class Song
+    {
+        public string Title { get; set; }
+        public string AudioUrl { get; set; }
+        public string OriginalUrl { get; set; }
     }
 }

@@ -20,6 +20,7 @@ namespace SunBot.Modules
             _client = service.GetRequiredService<DiscordSocketClient>();
             _config = service.GetRequiredService<Configuration>();
             _client.UserJoined += AnnounceJoinedUser;
+            _client.SetGameAsync($"{_config.Bot.Prefix}help");
         }
 
         public async Task AnnounceJoinedUser(SocketGuildUser user)

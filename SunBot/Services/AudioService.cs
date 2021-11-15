@@ -42,9 +42,8 @@ namespace SunBot.Services
 
         public async Task LeaveVoiceChannelAsync(IVoiceChannel channel)
         {
-            StopSongAsync();
+            _playing = false;
             ClearQueue();
-
             await channel.DisconnectAsync();
             _audioClient.Dispose();
         }
@@ -70,7 +69,7 @@ namespace SunBot.Services
                 _songQueue.Enqueue(song);
 
                 embed.Description = $"Queued: [{song.Title}]({song.OriginalUrl})";
-                embed.Color = Color.Green;
+                embed.Color = Color.Gold;
 
                 return embed.Build();
             }
@@ -144,7 +143,7 @@ namespace SunBot.Services
                 }
 
                 embed.Description = builder.ToString();
-                embed.Color = Color.Green;
+                embed.Color = Color.Gold;
             }
 
             return embed.Build();
@@ -158,7 +157,7 @@ namespace SunBot.Services
             {
                 _songQueue.Clear();
                 embed.Description = "Queue cleared!";
-                embed.Color = Color.Green;
+                embed.Color = Color.Gold;
             }
             else
             {
@@ -203,7 +202,7 @@ namespace SunBot.Services
                     var embed = new EmbedBuilder
                     {
                         Description = $"Now playing: [{_currentSong.Title}]({_currentSong.OriginalUrl})",
-                        Color = Color.Green
+                        Color = Color.Gold
                     };
                     await _responseChannel.SendMessageAsync(embed: embed.Build());
 

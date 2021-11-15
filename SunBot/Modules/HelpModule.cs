@@ -3,6 +3,8 @@ using Discord.Commands;
 using Microsoft.Extensions.DependencyInjection;
 using SunBot.Services;
 using System;
+using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace SunBot.Modules
@@ -19,101 +21,76 @@ namespace SunBot.Modules
             _commandService = services.GetRequiredService<CommandService>();
         }
 
-        // Help Command
-        [Command("")]
+        [Command("", RunMode = RunMode.Async)]
         [Summary("Info on commands.")]
-        public async Task HelpAsync()
+        public async Task HelpAsync(string query = "")
         {
-            var commands = _commandService.Commands;
-
-            var embed = new EmbedBuilder
+            if (query == string.Empty)
             {
-                Title = "Bot Commands",
-                Description = $"The prefix of the bot is {_config.Bot.Prefix}",
-                Color = Color.Gold
-            };
+                var modules = _commandService.Modules;
+                var embed = new EmbedBuilder();
+                var builder = new StringBuilder();
 
-            foreach (var command in commands)
+                embed.Title = "Jolly co-operation!";
+                embed.Color = Color.Gold;
+                embed.Footer = new EmbedFooterBuilder
+                {
+                    Text = $"{_config.Bot.Prefix}help [command] for more info!",
+                };
+
+                
+                builder.AppendLine($"Spot my summon signature easily by its brilliant aura `{_config.Bot.Prefix}`!\n");
+                
+                foreach (var module in modules)
+                {
+                    if (module.Name == "help") continue;
+
+                    builder.AppendLine($"**{module.Name}**");
+                    
+                    foreach (var command in module.Commands)
+                    {
+                        builder.AppendLine($"> {command.Name}");
+                    }
+
+                    builder.AppendLine();
+                }
+
+                embed.Description = builder.ToString();
+                await ReplyAsync(embed: embed.Build());
+            }
+            else
             {
-                if (string.IsNullOrEmpty(command.Name)) continue;
+                var commands = _commandService.Commands.ToList();
+                var command = commands.Find(x => x.Name == query);
+                var embed = new EmbedBuilder();
 
-                embed.AddField("Title", command.Name);
-                embed.AddField("Description", command.Summary);
-            };
-             
-            await ReplyAsync(embed: embed.Build());
-        }
+                if (command == null)
+                {
+                    embed.Description = $"Could not find the command: `{query}`";
+                    embed.Color = Color.Red;
+                    await ReplyAsync(embed: embed.Build());
+                }
+                else
+                {
+                    var builder = new StringBuilder();
+                    builder.AppendLine($"{command.Summary}\n");
+                    builder.AppendLine($"**Example**");
 
-        // Commands under InfoModule
-        [Command("say")]
-        [Summary("Info on command: \"say\"")]
-        public async Task HelpSayAsync()
-        {
-            var embed = new EmbedBuilder
-            {
-                Title = "Say command",
-                Description = "Echoes a message.",
-                Color = Color.Gold
-            };
-            embed.AddField("Example", $"`{_config.Bot.Prefix}say Hello world!`");
+                    builder.Append($"{_config.Bot.Prefix}{command.Name} ");
 
-            await ReplyAsync(embed: embed.Build());
-        }
+                    foreach(var parameter in command.Parameters)
+                    {
+                        builder.Append($"`{parameter.Summary}` ");
+                    }
 
-        // Commands under AdminModule
-        [Command("ban")]
-        [Summary("Info on command: \"ban\"")]
-        public async Task HelpBanAsync()
-        {
-            var embed = new EmbedBuilder
-            {
-                Title = "Ban command",
-                Description = "Bans a specified user.",
-                Color = Color.Gold
-            };
-            embed.AddField("Parameters", "`user` - the user to be banned\n" +
-                                         "`ban reason` - the reason for the ban (this parameter is optional!)");
-            embed.AddField("Examples", $"{_config.Bot.Prefix}ban `user` `ban reason`\n" +
-                                       $"{_config.Bot.Prefix}ban `@testuser` `toxic behaviour`\n" +
-                                       $"{_config.Bot.Prefix}ban `@testuser`");
 
-            await ReplyAsync(embed: embed.Build());
-        }
+                    embed.Title = $"{command.Name} command";
+                    embed.Description = builder.ToString();
+                    embed.Color = Color.Gold;
 
-        [Command("kick")]
-        [Summary("Info on command: \"kick\"")]
-        public async Task HelpKickAsync()
-        {
-            var embed = new EmbedBuilder
-            {
-                Title = "Kick command",
-                Description = "Kicks a specified user.",
-                Color = Color.Gold
-            };
-            embed.AddField("Parameters", "`user` - the user to be kicked\n" +
-                                         "`kick reason` - the reason for the kick (this parameter is optional!)");
-            embed.AddField("Examples", $"{_config.Bot.Prefix}kick `user` `kick reason`\n" +
-                                       $"{_config.Bot.Prefix}kick `@testuser` `toxic behaviour`\n" +
-                                       $"{_config.Bot.Prefix}kick `@testuser`");
-
-            await ReplyAsync(embed: embed.Build());
-        }
-
-        [Command("clear")]
-        [Summary("Info on command: \"clear\"")]
-        public async Task HelpClearAsync()
-        {
-            var embed = new EmbedBuilder
-            {
-                Title = "Clear command",
-                Description = "Clears a specified amount of messages from a text channel.",
-                Color = Color.Gold
-            };
-            embed.AddField("Parameters", "`amount of messages` - the amount of messages to clear from the textchannel");
-            embed.AddField("Examples", $"{_config.Bot.Prefix}clear `amount of messages`\n" +
-                                       $"{_config.Bot.Prefix}clear `50`");
-
-            await ReplyAsync(embed: embed.Build());
+                    await ReplyAsync(embed: embed.Build());
+                }
+            }
         }
     }
 }

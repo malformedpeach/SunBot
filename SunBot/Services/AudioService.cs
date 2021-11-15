@@ -17,8 +17,7 @@ namespace SunBot.Services
     public class AudioService
     {
         private IAudioClient _audioClient;
-        private MediaFoundationReader _mediaReader;
-        private AudioOutStream _outputStream;
+        private CancellationTokenSource _tokenSource = null;
         private Queue<Song> _songQueue = new Queue<Song>();
         private Song _currentSong;
         private bool _playing = false;
@@ -45,10 +44,17 @@ namespace SunBot.Services
 
         public async Task LeaveVoiceChannelAsync(IVoiceChannel channel)
         {
+            // Stop music
+
+            // Clear queue
+
+            // Dispose all disposables
+
             await channel.DisconnectAsync();
+            _audioClient.Dispose();
         }
         
-        public async Task<Embed> EnqueueSongAsync(IVoiceChannel voiceChannel, ISocketMessageChannel textChannel, string songUrl = "")
+        public async Task<Embed> PlaySongAsync(IVoiceChannel voiceChannel, ISocketMessageChannel textChannel, string songUrl = "")
         {
             var embed = new EmbedBuilder();
 
@@ -79,12 +85,13 @@ namespace SunBot.Services
                 Song song = await GetHighestBitrateUrlAsync(songUrl);
                 _songQueue.Enqueue(song);
 
-                await PlaySongAsync();
+                await ProcessQueueAsync();
             }
             else if (string.IsNullOrEmpty(songUrl) && _songQueue.Count > 0)
             {
                 _playing = true; // Wonky af? rework this
-                await PlaySongAsync();
+
+                await ProcessQueueAsync();
             }
 
 
@@ -102,9 +109,7 @@ namespace SunBot.Services
         public async Task StopSongAsync()
         {
             _playing = false;
-
-            if (_outputStream != null) await _outputStream.DisposeAsync();
-            if (_mediaReader != null) await _mediaReader.DisposeAsync();
+            _tokenSource.Cancel();
         }
 
         public async Task SkipSongAsync()
@@ -116,8 +121,7 @@ namespace SunBot.Services
             };
             await _responseChannel.SendMessageAsync(embed: embed.Build());
 
-            if (_outputStream != null) await _outputStream.DisposeAsync();
-            if (_mediaReader != null) await _mediaReader.DisposeAsync();
+            _tokenSource.Cancel();
         }
 
         public Embed GetCurrentQueue()
@@ -147,11 +151,10 @@ namespace SunBot.Services
             return embed.Build();
         }
 
+
         private async Task<Song> GetHighestBitrateUrlAsync(string songUrl)
         {
-            // TODO: Error handling? Rename method to something more fitting.
             var youtube = new YoutubeClient();
-
             var video = await youtube.Videos.GetAsync(songUrl);
 
             var streamManifest = await youtube.Videos.Streams.GetManifestAsync(video.Id);
@@ -163,18 +166,20 @@ namespace SunBot.Services
                 AudioUrl = streamInfo.Url,
                 OriginalUrl = songUrl,
             };
-            
+                
             return song;
         }
         
-        private async Task PlaySongAsync()
+        private async Task ProcessQueueAsync()
         {
-            while (_songQueue.Count > 0 && _playing)
+            while(_songQueue.Count > 0 && _playing)
             {
-                _currentSong = _songQueue.Dequeue();
+                _tokenSource = new CancellationTokenSource();
+                var cancellationToken = _tokenSource.Token;
 
-                _mediaReader = new MediaFoundationReader(_currentSong.AudioUrl);
-                _outputStream = _audioClient.CreatePCMStream(AudioApplication.Music);
+                _currentSong = _songQueue.Dequeue();
+                using var mediaReader = new MediaFoundationReader(_currentSong.AudioUrl);
+                using var outputStream = _audioClient.CreatePCMStream(AudioApplication.Music);
 
                 try
                 {
@@ -185,17 +190,16 @@ namespace SunBot.Services
                     };
                     await _responseChannel.SendMessageAsync(embed: embed.Build());
 
-                    await _audioClient.SetSpeakingAsync(true);
-                    await _mediaReader.CopyToAsync(_outputStream);
-                    await _outputStream.FlushAsync();
-                    await _audioClient.SetSpeakingAsync(false);
-
-                    await _mediaReader.DisposeAsync();
-                    await _outputStream.DisposeAsync();
+                    await mediaReader.CopyToAsync(outputStream, cancellationToken);
+                    await outputStream.FlushAsync(cancellationToken);
                 }
-                catch (Exception e)
+                catch (Exception ex)
                 {
-                    Console.WriteLine($"AudioService.PlaySongAsync: {e.Message}");
+                    Console.WriteLine($"AudioService.ProcessQueue: {ex.Message}");
+                }
+                finally
+                {
+                    _tokenSource.Dispose();
                 }
             }
         }

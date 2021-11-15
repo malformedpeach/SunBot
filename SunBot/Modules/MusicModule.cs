@@ -40,7 +40,7 @@ namespace SunBot.Modules
             var voiceChannel = (Context.User as IGuildUser)?.VoiceChannel;
             var textChannel = Context.Message.Channel;
 
-            var resultMessage = await Service.EnqueueSongAsync(voiceChannel, textChannel, songUrl);
+            var resultMessage = await Service.PlaySongAsync(voiceChannel, textChannel, songUrl);
             await ReplyAsync(embed: resultMessage);
         }
 

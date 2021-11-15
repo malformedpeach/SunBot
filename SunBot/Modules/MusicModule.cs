@@ -40,7 +40,7 @@ namespace SunBot.Modules
         [Command("stop", RunMode = RunMode.Async)]
         public async Task StopAsync()
         {
-            await Service.StopSongAsync();
+            Service.StopSongAsync();
         }
         
         [Command("skip", RunMode = RunMode.Async)]
@@ -53,6 +53,13 @@ namespace SunBot.Modules
         public async Task QueueAsync()
         {
             var resultEmbed = Service.GetCurrentQueue();
+            await ReplyAsync(embed: resultEmbed);
+        }
+
+        [Command("clearqueue", RunMode = RunMode.Async)]
+        public async Task ClearQueueAsync()
+        {
+            var resultEmbed = Service.ClearQueue();
             await ReplyAsync(embed: resultEmbed);
         }
 

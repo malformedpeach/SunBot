@@ -42,11 +42,8 @@ namespace SunBot.Services
 
         public async Task LeaveVoiceChannelAsync(IVoiceChannel channel)
         {
-            // Stop music
-
-            // Clear queue
-
-            // Dispose all disposables
+            StopSongAsync();
+            ClearQueue();
 
             await channel.DisconnectAsync();
             _audioClient.Dispose();
@@ -94,7 +91,7 @@ namespace SunBot.Services
 
 
             // Check if zero. If user stops playback we don't want to show the 'no more songs' message.
-            if (_songQueue.Count == 0)
+            if (_songQueue.Count == 0 && _playing)
             {
                 _playing = false;
                 embed.Description = "No more songs in queue.";
@@ -104,7 +101,7 @@ namespace SunBot.Services
             return embed.Build();
         }
         
-        public async Task StopSongAsync()
+        public void StopSongAsync()
         {
             _playing = false;
             _tokenSource.Cancel();
@@ -128,14 +125,18 @@ namespace SunBot.Services
 
             if (_songQueue.Count == 0)
             {
-                embed.Description = "Queue is empty.";
+                embed.Description = "The queue is empty.";
                 embed.Color = Color.Red;
             }
             else
             {
                 var builder = new StringBuilder();
                 var currentQueue = _songQueue.ToArray();
-                builder.AppendLine($"Currently playing: [{_currentSong.Title}]({_currentSong.OriginalUrl})");
+
+                if(_playing)
+                {
+                    builder.AppendLine($"Currently playing: [{_currentSong.Title}]({_currentSong.OriginalUrl})");
+                }
 
                 for (int i = 0; i < currentQueue.Length; i++)
                 {
@@ -149,6 +150,24 @@ namespace SunBot.Services
             return embed.Build();
         }
 
+        public Embed ClearQueue()
+        {
+            var embed = new EmbedBuilder();
+            
+            if(_songQueue.Count > 0)
+            {
+                _songQueue.Clear();
+                embed.Description = "Queue cleared!";
+                embed.Color = Color.Green;
+            }
+            else
+            {
+                embed.Description = "Queue already empty!";
+                embed.Color = Color.Red;
+            }
+
+            return embed.Build();
+        }
 
         private async Task<Song> GetHighestBitrateUrlAsync(string songUrl)
         {

@@ -1,11 +1,9 @@
 ﻿using Discord;
 using Discord.Audio;
-using Discord.Commands;
 using Discord.WebSocket;
 using NAudio.Wave;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;

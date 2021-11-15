@@ -1,14 +1,7 @@
 ﻿using Discord;
 using Discord.Commands;
-using Microsoft.Extensions.DependencyInjection;
 using SunBot.Services;
-using System;
 using System.Threading.Tasks;
-
-using NAudio.Wave;
-using YoutubeExplode;
-using YoutubeExplode.Videos.Streams;
-using Discord.Audio;
 
 namespace SunBot.Modules
 {

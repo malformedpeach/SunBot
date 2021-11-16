@@ -1,6 +1,8 @@
 ﻿using Discord;
 using Discord.Commands;
+using Discord.WebSocket;
 using SunBot.Services;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace SunBot.Modules
@@ -14,8 +16,13 @@ namespace SunBot.Modules
         public async Task JoinAsync()
         {
             var voiceChannel = (Context.User as IGuildUser)?.VoiceChannel;
-            var textChannel = Context.Message.Channel;
-            
+            var textChannel = Context.Guild.TextChannels.FirstOrDefault(x => x.Name == "commands");
+
+            if (textChannel == null)
+            {
+                textChannel = Context.Guild.DefaultChannel;
+            }
+
             var resultEmbed = await Service.JoinVoiceChannelAsync(voiceChannel, textChannel);
             if (resultEmbed.Description != string.Empty) await ReplyAsync(embed: resultEmbed);
         }

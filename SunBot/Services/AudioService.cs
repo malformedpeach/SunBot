@@ -24,6 +24,7 @@ namespace SunBot.Services
         public async Task<Embed> JoinVoiceChannelAsync(IVoiceChannel voiceChannel, ISocketMessageChannel textChannel) 
         {
             _responseChannel = textChannel; // I think i'm cool with this
+            
             var embed = new EmbedBuilder();
 
             if (voiceChannel == null)

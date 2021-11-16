@@ -9,7 +9,6 @@ using System.Threading.Tasks;
 
 namespace SunBot.Modules
 {
-    [Group("help")]
     public class HelpModule : ModuleBase<SocketCommandContext>
     {
         private Configuration _config;
@@ -21,7 +20,7 @@ namespace SunBot.Modules
             _commandService = services.GetRequiredService<CommandService>();
         }
 
-        [Command("", RunMode = RunMode.Async)]
+        [Command("help", RunMode = RunMode.Async)]
         [Summary("Info on commands.")]
         public async Task HelpAsync(string query = "")
         {
@@ -43,7 +42,7 @@ namespace SunBot.Modules
                 
                 foreach (var module in modules)
                 {
-                    if (module.Name == "help") continue;
+                    if (module.Name == "HelpModule") continue;
 
                     builder.AppendLine($"**{module.Name}**");
                     

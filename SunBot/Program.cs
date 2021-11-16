@@ -34,10 +34,15 @@ namespace SunBot
 
         private ServiceProvider ConfigureServices()
         {
+            var client = new DiscordSocketClient(new DiscordSocketConfig
+            {
+                ExclusiveBulkDelete = true
+            });
+
             return new ServiceCollection()
                 .AddSingleton<AudioService>()
                 .AddSingleton<Configuration>()
-                .AddSingleton<DiscordSocketClient>()
+                .AddSingleton<DiscordSocketClient>(client)
                 .AddSingleton<CommandService>()
                 .AddSingleton<CommandHandler>()
                 .BuildServiceProvider();

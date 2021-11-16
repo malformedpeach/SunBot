@@ -14,75 +14,46 @@ namespace SunBot.Modules
 {
     public class AdminModule : ModuleBase<SocketCommandContext>
     {
-        private Configuration _config;
-
-        public AdminModule(IServiceProvider service)
+        [Command("say", RunMode = RunMode.Async)]
+        [Summary("Echoes a message")]
+        public async Task SayAsync([Summary("Message to echo")]string echo)
         {
-            _config = service.GetRequiredService<Configuration>();
-        }
+            await ReplyAsync(echo);
+        } 
 
-        [Command("ban")]
-        [Summary("Ban a specified user")]
-        [Alias("banuser")]
+        [Command("kick", RunMode = RunMode.Async)]
         [RequireUserPermission(GuildPermission.Administrator)]
-        public async Task BanUserAsync([Summary("User to ban")] SocketGuildUser user = null, [Remainder][Summary("Reason for ban")]string banReason = null)
+        public async Task KickAsync(SocketGuildUser user, [Remainder]string kickReason = "")
         {
-            if (user == null)
-            {
-                var embed = new EmbedBuilder
-                {
-                    Title = "Command error",
-                    Description = "Mention a **user** to ban when using this command. \nOptional parameter: **ban reason**",
-                    Color = Color.Gold,
-                };
-                embed.AddField("Example", $"{_config.Bot.Prefix}ban @user **ban reason**\n{_config.Bot.Prefix}banuser @user **ban reason**", false);
-
-                await ReplyAsync(embed: embed.Build());
-            }
-            else
-            {
-                await Context.Guild.AddBanAsync(user: user, reason: banReason);
-                await ReplyAsync($"{user} banned for: {banReason ?? "No reason."}");
-            }
-        }
-
-        [Command("kick")]
-        [Summary("Kick a specified user")]
-        [Alias("kickuser")]
-        [RequireUserPermission(GuildPermission.Administrator)]
-        public async Task KickUserAsync([Summary("User to kick")] SocketGuildUser user = null, [Remainder][Summary("Reason for kick")]string kickReason = null)
-        {
-            if (user == null)
-            {
-                var embed = new EmbedBuilder
-                {
-                    Title = "Command error",
-                    Description = "Mention a **user** to kick when using this command.",
-                    Color = Color.Gold
-                };
-                embed.AddField("Example", $"{_config.Bot.Prefix}kick @user **kick reason**\n{_config.Bot.Prefix}kickuser @user **kick reason**", false);
-
-                await ReplyAsync(embed: embed.Build());
-            }
+            if (user == Context.Guild.Owner) await ReplyAsync("Big mistake homie!");
             else
             {
                 await user.KickAsync(kickReason);
-                await ReplyAsync($"{user} kicked for: {kickReason ?? "No reason."}");
             }
         }
 
-        [Command("clear")]
-        [Summary("Clear a specified amount of message from a text channel")]
-        [Alias("purge")]
+        [Command("ban", RunMode = RunMode.Async)]
         [RequireUserPermission(GuildPermission.Administrator)]
-        public async Task ClearChannelAsync([Summary("Amount of messages to clear")]int amount)
+        public async Task BanAsync(SocketGuildUser user, [Remainder]string banReason = "")
+        {
+            if (user == Context.Guild.Owner) await ReplyAsync("Big mistake homie!");
+            else
+            {
+                await user.BanAsync(reason: banReason);
+            }
+        }
+
+        [Command("clear", RunMode = RunMode.Async)]
+        [RequireUserPermission(GuildPermission.Administrator)]
+        public async Task ClearAsync(int amount)
         {
             var messages = await Context.Channel.GetMessagesAsync(amount + 1).FlattenAsync();
+
             await (Context.Channel as ITextChannel).DeleteMessagesAsync(messages);
 
-            var purgeMessage = await ReplyAsync($"{amount} messages purged, this message will be deleted in 5 seconds.");
+            var deleteMessage = await ReplyAsync($"I removed {amount} messages! this message will be removed in 5 seconds.");
             await Task.Delay(5000);
-            await purgeMessage.DeleteAsync();
+            await deleteMessage.DeleteAsync();
         }
     }
 }

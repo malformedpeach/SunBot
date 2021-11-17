@@ -22,8 +22,9 @@ namespace SunBot.Modules
         } 
 
         [Command("kick", RunMode = RunMode.Async)]
+        [Summary("Kick a user from the server")]
         [RequireUserPermission(GuildPermission.Administrator)]
-        public async Task KickAsync(SocketGuildUser user, [Remainder]string kickReason = "")
+        public async Task KickAsync([Summary("@User")]SocketGuildUser user, [Summary("reason for kick (Optional)")][Remainder]string kickReason = "")
         {
             if (user == Context.Guild.Owner) await ReplyAsync("Big mistake homie!");
             else
@@ -33,8 +34,9 @@ namespace SunBot.Modules
         }
 
         [Command("ban", RunMode = RunMode.Async)]
+        [Summary("Ban a user from the server")]
         [RequireUserPermission(GuildPermission.Administrator)]
-        public async Task BanAsync(SocketGuildUser user, [Remainder]string banReason = "")
+        public async Task BanAsync([Summary("@User")]SocketGuildUser user, [Summary("reason for ban (Optional)")][Remainder]string banReason = "")
         {
             if (user == Context.Guild.Owner) await ReplyAsync("Big mistake homie!");
             else
@@ -44,8 +46,9 @@ namespace SunBot.Modules
         }
 
         [Command("clear", RunMode = RunMode.Async)]
+        [Summary("Clear a specified amount of messages from a text channel")]
         [RequireUserPermission(GuildPermission.Administrator)]
-        public async Task ClearAsync(int amount)
+        public async Task ClearAsync([Summary("5")]int amount)
         {
             var messages = await Context.Channel.GetMessagesAsync(amount + 1).FlattenAsync();
 

@@ -14,6 +14,9 @@ namespace SunBot.Modules
 {
     public class AdminModule : ModuleBase<SocketCommandContext>
     {
+        public Configuration Config { get; set; }
+
+
         [Command("say", RunMode = RunMode.Async)]
         [Summary("Echoes a message")]
         public async Task SayAsync([Summary("Message to echo")][Remainder]string echo)
@@ -57,6 +60,40 @@ namespace SunBot.Modules
             var deleteMessage = await ReplyAsync($"I removed {amount} messages! this message will be removed in 5 seconds.");
             await Task.Delay(5000);
             await deleteMessage.DeleteAsync();
+        }
+
+        [Command("setdefaultchannel")]
+        [Summary("Set my default response channel")]
+        [RequireUserPermission(GuildPermission.Administrator)]
+        public async Task SetDefaultChannel([Summary("#channel")] SocketTextChannel channel)
+        {
+            if (channel == null) return; // reply?
+            else
+            {
+                Config.DefaultTextChannel = channel;
+
+                // TODO: save changes
+                // Config.SaveToAppSettings();
+            }
+        }
+
+        [Command("setprefix", RunMode = RunMode.Async)]
+        [Summary("Set my summon signature (prefix)")]
+        [RequireUserPermission(GuildPermission.Administrator)]
+        public async Task SetBotPrefix(string prefix)
+        {
+            if (char.TryParse(prefix, out char newPrefix))
+            {
+                Config.Bot.Prefix = newPrefix;
+
+                // TODO: save changes
+                // Config.SaveToAppSettings();
+            }
+            else
+            {
+                // error msg
+                await ReplyAsync("You done goofed");
+            }
         }
     }
 }

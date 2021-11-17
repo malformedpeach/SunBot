@@ -2,6 +2,7 @@
 using Discord.Audio;
 using Discord.WebSocket;
 using NAudio.Wave;
+using SunBot.Models;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -220,12 +221,5 @@ namespace SunBot.Services
                 }
             }
         }
-    }
-
-    public class Song
-    {
-        public string Title { get; set; }
-        public string AudioUrl { get; set; }
-        public string OriginalUrl { get; set; }
     }
 }

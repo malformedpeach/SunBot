@@ -6,6 +6,7 @@ using System;
 using System.Threading.Tasks;
 using SunBot.Services;
 using Discord.Audio;
+using System.Linq;
 
 namespace SunBot
 {
@@ -20,13 +21,14 @@ namespace SunBot
                 var config = services.GetRequiredService<Configuration>();
                 if (config.Bot == null)
                 {
+                    Console.Write("Press any key to continue..");
                     Console.ReadKey();
                     return;
                 }
                 
                 var client = services.GetRequiredService<DiscordSocketClient>();
-                client.Log += Log;
-
+                client.GuildAvailable += config.InitializeDefaultChannel;
+                
                 await client.LoginAsync(TokenType.Bot, config.Bot.Token);
                 await client.StartAsync();
 
@@ -42,19 +44,31 @@ namespace SunBot
             {
                 ExclusiveBulkDelete = true
             });
+            client.Log += Log;
+            client.UserJoined += AnnounceUserJoined;
 
             return new ServiceCollection()
-                .AddSingleton<AudioService>()
                 .AddSingleton<Configuration>()
-                .AddSingleton<DiscordSocketClient>(client)
                 .AddSingleton<CommandService>()
                 .AddSingleton<CommandHandler>()
+                .AddSingleton<DiscordSocketClient>(client)
+                .AddSingleton<AudioService>()
                 .BuildServiceProvider();
         }
 
         private Task Log(LogMessage msg)
         {
             Console.WriteLine(msg.ToString());
+            return Task.CompletedTask;
+        }
+
+        private Task AnnounceUserJoined(SocketGuildUser user)
+        {
+            var defaultChannel = user.Guild.TextChannels.FirstOrDefault(x => x.Name == "general");
+
+            if (defaultChannel == null) defaultChannel = user.Guild.DefaultChannel;
+
+            defaultChannel.SendMessageAsync($"Welcome to {user.Guild.Name}, {user.Mention}!");
             return Task.CompletedTask;
         }
     }

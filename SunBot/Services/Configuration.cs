@@ -1,14 +1,19 @@
-﻿using Newtonsoft.Json;
+﻿using Discord;
+using Discord.WebSocket;
+using Newtonsoft.Json;
+using SunBot.Models;
 using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Text;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace SunBot.Services
 {
-    class Configuration
+    public class Configuration
     {
         public Bot Bot { get; set; }
+        public SocketTextChannel DefaultTextChannel { get; set; }
+
 
         public Configuration()
         {
@@ -24,11 +29,18 @@ namespace SunBot.Services
                     Console.WriteLine($"Configuration error: {ex.Message}");
             }
         }
-    }
 
-    class Bot
-    {
-        public string Token { get; set; }
-        public char Prefix { get; set; }
+        public Task InitializeDefaultChannel(SocketGuild guild)
+        {
+            DefaultTextChannel = guild.TextChannels.FirstOrDefault(x => x.Id == Bot.DefaultTextChannelId);
+            if (DefaultTextChannel == null) DefaultTextChannel = guild.DefaultChannel;
+
+            return Task.CompletedTask;
+        }
+
+        public void SaveToAppSettings()
+        {
+            throw new NotImplementedException();
+        }
     }
 }

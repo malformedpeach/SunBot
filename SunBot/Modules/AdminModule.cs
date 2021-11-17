@@ -16,7 +16,7 @@ namespace SunBot.Modules
     {
         [Command("say", RunMode = RunMode.Async)]
         [Summary("Echoes a message")]
-        public async Task SayAsync([Summary("Message to echo")]string echo)
+        public async Task SayAsync([Summary("Message to echo")][Remainder]string echo)
         {
             await ReplyAsync(echo);
         } 

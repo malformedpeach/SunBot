@@ -13,6 +13,7 @@ namespace SunBot.Modules
 
 
         [Command("join", RunMode = RunMode.Async)]
+        [Summary("Join the voice channel invoking user is connected to")]
         public async Task JoinAsync()
         {
             var voiceChannel = (Context.User as IGuildUser)?.VoiceChannel;
@@ -28,6 +29,7 @@ namespace SunBot.Modules
         }
 
         [Command("leave", RunMode = RunMode.Async)]
+        [Summary("Leaves voice channel")]
         public async Task LeaveAsync()
         {
             var channel = (Context.User as IGuildUser)?.VoiceChannel;
@@ -35,7 +37,8 @@ namespace SunBot.Modules
         }
 
         [Command("play", RunMode = RunMode.Async)]
-        public async Task PlayAsync(string songUrl = "")
+        [Summary("Plays/Enqueues the song from specified url")]
+        public async Task PlayAsync([Summary("youtube url")]string songUrl = "")
         {
             var voiceChannel = (Context.User as IGuildUser)?.VoiceChannel;
             var textChannel = Context.Message.Channel;
@@ -45,18 +48,21 @@ namespace SunBot.Modules
         }
 
         [Command("stop", RunMode = RunMode.Async)]
+        [Summary("Stops playback of queue")]
         public async Task StopAsync()
         {
             Service.StopSongAsync();
         }
         
         [Command("skip", RunMode = RunMode.Async)]
+        [Summary("Skips the current song")]
         public async Task SkipAsync()
         {
             await Service.SkipSongAsync();
         }
 
         [Command("queue", RunMode = RunMode.Async)]
+        [Summary("Displays a list of the enqueued songs")]
         public async Task QueueAsync()
         {
             var resultEmbed = Service.GetCurrentQueue();
@@ -64,6 +70,7 @@ namespace SunBot.Modules
         }
 
         [Command("clearqueue", RunMode = RunMode.Async)]
+        [Summary("Clears the queue")]
         public async Task ClearQueueAsync()
         {
             var resultEmbed = Service.ClearQueue();

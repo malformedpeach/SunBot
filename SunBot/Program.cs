@@ -18,7 +18,11 @@ namespace SunBot
             using (var services = ConfigureServices())
             {
                 var config = services.GetRequiredService<Configuration>();
-                if (config.Bot == null) return;
+                if (config.Bot == null)
+                {
+                    Console.ReadKey();
+                    return;
+                }
                 
                 var client = services.GetRequiredService<DiscordSocketClient>();
                 client.Log += Log;

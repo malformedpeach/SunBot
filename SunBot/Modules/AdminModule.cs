@@ -67,13 +67,11 @@ namespace SunBot.Modules
         [RequireUserPermission(GuildPermission.Administrator)]
         public async Task SetDefaultChannel([Summary("#channel")] SocketTextChannel channel)
         {
-            if (channel == null) return; // reply?
+            if (channel == null) return;
             else
             {
                 Config.DefaultTextChannel = channel;
-
-                // TODO: save changes
-                // Config.SaveToAppSettings();
+                Config.SaveToAppSettings();
             }
         }
 
@@ -85,13 +83,10 @@ namespace SunBot.Modules
             if (char.TryParse(prefix, out char newPrefix))
             {
                 Config.Bot.Prefix = newPrefix;
-
-                // TODO: save changes
-                // Config.SaveToAppSettings();
+                Config.SaveToAppSettings();
             }
             else
             {
-                // error msg
                 await ReplyAsync("You done goofed");
             }
         }

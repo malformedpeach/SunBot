@@ -23,10 +23,8 @@ namespace SunBot.Services
             }
             catch (Exception ex)
             {
-                if (ex.InnerException.Message == "String must be exactly one character long.")
-                    Console.WriteLine("Configuration error: Please set your desired prefix in appsettings.json.");
-                else
-                    Console.WriteLine($"Configuration error: {ex.Message}");
+                Console.WriteLine($"Configuration error: Take a look at your appsettings.json.\n" +
+                                  $"Exception message: {ex.Message}");
             }
         }
 
@@ -40,7 +38,9 @@ namespace SunBot.Services
 
         public void SaveToAppSettings()
         {
-            throw new NotImplementedException();
+            var json = JsonConvert.SerializeObject(Bot);
+
+            if (File.Exists("appsettings.json")) File.WriteAllText("appsettings.json", json);
         }
     }
 }

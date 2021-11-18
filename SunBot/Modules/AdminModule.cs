@@ -14,7 +14,7 @@ namespace SunBot.Modules
 {
     public class AdminModule : ModuleBase<SocketCommandContext>
     {
-        public Configuration Config { get; set; }
+        public IConfiguration Config { get; set; }
 
 
         [Command("say", RunMode = RunMode.Async)]

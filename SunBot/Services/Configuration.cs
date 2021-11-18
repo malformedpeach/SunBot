@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace SunBot.Services
 {
-    public class Configuration
+    public class Configuration : IConfiguration
     {
         public Bot Bot { get; set; }
         public SocketTextChannel DefaultTextChannel { get; set; }

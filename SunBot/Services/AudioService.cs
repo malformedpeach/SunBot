@@ -15,53 +15,48 @@ namespace SunBot.Services
 {
     public class AudioService
     {
+        private IConfiguration _config;
         private IAudioClient _audioClient;
-        private CancellationTokenSource _tokenSource = null;
-        private Queue<Song> _songQueue = new Queue<Song>();
+        private CancellationTokenSource _tokenSource;
         private Song _currentSong;
+        private Queue<Song> _songQueue = new Queue<Song>();
         private bool _playing = false;
-        private ISocketMessageChannel _responseChannel;
 
-        public async Task<Embed> JoinVoiceChannelAsync(IVoiceChannel voiceChannel, ISocketMessageChannel textChannel) 
+        public AudioService(IConfiguration config)
         {
-            _responseChannel = textChannel; // I think i'm cool with this
-            
-            var embed = new EmbedBuilder();
+            _config = config;
+        }
 
+        public async Task JoinVoiceChannelAsync(IVoiceChannel voiceChannel) 
+        {
             if (voiceChannel == null)
             {
-                embed.Description = "Could not join channel.";
-                embed.Color = Color.Red;
-
-                return embed.Build();
+                var embed = new EmbedBuilder
+                {
+                    Description = "Could not join channel.",
+                    Color = Color.Red
+                };
+                await _config.DefaultTextChannel.SendMessageAsync(embed: embed.Build());
             }
             else
             {
                 _audioClient = await voiceChannel.ConnectAsync();
-                return embed.Build();
             }
         }
 
-        public async Task LeaveVoiceChannelAsync(IVoiceChannel channel)
+        public async Task LeaveVoiceChannelAsync()
         {
             _playing = false;
-            ClearQueue();
-            await channel.DisconnectAsync();
-            _audioClient.Dispose();
+            _tokenSource.Cancel();
+            await _audioClient.StopAsync();
         }
         
-        public async Task<Embed> PlaySongAsync(IVoiceChannel voiceChannel, ISocketMessageChannel textChannel, string songUrl = "")
+        public async Task PlaySongAsync(IVoiceChannel voiceChannel, string songUrl = "")
         {
-            var embed = new EmbedBuilder();
-
-            if (_audioClient == null)
+            if (_audioClient == null ||
+                _audioClient?.ConnectionState == ConnectionState.Disconnected)
             {
-                var resultMessage =  await JoinVoiceChannelAsync(voiceChannel, textChannel);
-
-                if (!string.IsNullOrEmpty(resultMessage.Description))
-                {
-                    return resultMessage;
-                }
+                await JoinVoiceChannelAsync(voiceChannel);
             }
 
 
@@ -70,40 +65,35 @@ namespace SunBot.Services
                 Song song = await GetHighestBitrateUrlAsync(songUrl);
                 _songQueue.Enqueue(song);
 
+                var embed = new EmbedBuilder();
                 embed.Description = $"Queued: [{song.Title}]({song.OriginalUrl})";
                 embed.Color = Color.Gold;
-
-                return embed.Build();
+                await _config.DefaultTextChannel.SendMessageAsync(embed: embed.Build());
             }
-            else if (!string.IsNullOrEmpty(songUrl) && _songQueue.Count == 0)
+            else if (!_playing && !string.IsNullOrEmpty(songUrl))
             {
-                _playing = true; // Wonky af? rework this
+                _playing = true;
                 Song song = await GetHighestBitrateUrlAsync(songUrl);
                 _songQueue.Enqueue(song);
 
                 await ProcessQueueAsync();
             }
-            else if (string.IsNullOrEmpty(songUrl) && _songQueue.Count > 0)
+            else if (!_playing && string.IsNullOrEmpty(songUrl))
             {
-                _playing = true; // Wonky af? rework this
-
+                _playing = true;
                 await ProcessQueueAsync();
             }
-
-
-            // Check if zero. If user stops playback we don't want to show the 'no more songs' message.
-            if (_songQueue.Count == 0 && _playing)
-            {
-                _playing = false;
-                embed.Description = "No more songs in queue.";
-                embed.Color = Color.Red;
-            }
-
-            return embed.Build();
         }
         
-        public void StopSongAsync()
+        public async Task StopSongAsync()
         {
+            var embed = new EmbedBuilder
+            {
+                Description = "Stopping playback",
+                Color = Color.Gold
+            };
+
+            await _config.DefaultTextChannel.SendMessageAsync(embed: embed.Build());
             _playing = false;
             _tokenSource.Cancel();
         }
@@ -115,12 +105,11 @@ namespace SunBot.Services
                 Description = $"Skipping: [{_currentSong.Title}]({_currentSong.OriginalUrl})",
                 Color = Color.Red
             };
-            await _responseChannel.SendMessageAsync(embed: embed.Build());
-
+            await _config.DefaultTextChannel.SendMessageAsync(embed: embed.Build());
             _tokenSource.Cancel();
         }
 
-        public Embed GetCurrentQueue()
+        public async Task GetCurrentQueue()
         {
             var embed = new EmbedBuilder();
 
@@ -148,10 +137,10 @@ namespace SunBot.Services
                 embed.Color = Color.Gold;
             }
 
-            return embed.Build();
+            await _config.DefaultTextChannel.SendMessageAsync(embed: embed.Build());
         }
 
-        public Embed ClearQueue()
+        public async Task ClearQueueAsync()
         {
             var embed = new EmbedBuilder();
             
@@ -167,7 +156,7 @@ namespace SunBot.Services
                 embed.Color = Color.Red;
             }
 
-            return embed.Build();
+            await _config.DefaultTextChannel.SendMessageAsync(embed: embed.Build());
         }
 
         private async Task<Song> GetHighestBitrateUrlAsync(string songUrl)
@@ -196,9 +185,9 @@ namespace SunBot.Services
                 var cancellationToken = _tokenSource.Token;
 
                 _currentSong = _songQueue.Dequeue();
+
                 using var mediaReader = new MediaFoundationReader(_currentSong.AudioUrl);
                 using var outputStream = _audioClient.CreatePCMStream(AudioApplication.Music);
-
                 try
                 {
                     var embed = new EmbedBuilder
@@ -206,7 +195,7 @@ namespace SunBot.Services
                         Description = $"Now playing: [{_currentSong.Title}]({_currentSong.OriginalUrl})",
                         Color = Color.Gold
                     };
-                    await _responseChannel.SendMessageAsync(embed: embed.Build());
+                    await _config.DefaultTextChannel.SendMessageAsync(embed: embed.Build());
 
                     await mediaReader.CopyToAsync(outputStream, cancellationToken);
                     await outputStream.FlushAsync(cancellationToken);
@@ -219,6 +208,17 @@ namespace SunBot.Services
                 {
                     _tokenSource.Dispose();
                 }
+            }
+
+            _playing = false;
+            if (_songQueue.Count == 0)
+            {
+                var embed = new EmbedBuilder
+                {
+                    Description = "Queue is empty, stopping playback",
+                    Color = Color.Red,
+                };
+                await _config.DefaultTextChannel.SendMessageAsync(embed: embed.Build());
             }
         }
     }

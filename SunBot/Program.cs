@@ -16,26 +16,25 @@ namespace SunBot
 
         public async Task MainAsync()
         {
-            using (var services = ConfigureServices())
+            using var services = ConfigureServices();
+            var config = services.GetRequiredService<IConfiguration>();
+
+            if (config.Bot == null)
             {
-                var config = services.GetRequiredService<Configuration>();
-                if (config.Bot == null)
-                {
-                    Console.Write("Press any key to continue..");
-                    Console.ReadKey();
-                    return;
-                }
-                
-                var client = services.GetRequiredService<DiscordSocketClient>();
-                client.GuildAvailable += config.InitializeDefaultChannel;
-                
-                await client.LoginAsync(TokenType.Bot, config.Bot.Token);
-                await client.StartAsync();
-
-                await services.GetRequiredService<CommandHandler>().InstallCommandsAsync();
-
-                await Task.Delay(-1);
+                Console.Write("Press any key to continue..");
+                Console.ReadKey();
+                return;
             }
+
+            var client = services.GetRequiredService<DiscordSocketClient>();
+            client.GuildAvailable += config.InitializeDefaultChannel;
+
+            await client.LoginAsync(TokenType.Bot, config.Bot.Token);
+            await client.StartAsync();
+
+            await services.GetRequiredService<CommandHandler>().InstallCommandsAsync();
+
+            await Task.Delay(-1);
         }
 
         private ServiceProvider ConfigureServices()
@@ -48,7 +47,7 @@ namespace SunBot
             client.UserJoined += AnnounceUserJoined;
 
             return new ServiceCollection()
-                .AddSingleton<Configuration>()
+                .AddSingleton<IConfiguration, Configuration>()
                 .AddSingleton<CommandService>()
                 .AddSingleton<CommandHandler>()
                 .AddSingleton<DiscordSocketClient>(client)

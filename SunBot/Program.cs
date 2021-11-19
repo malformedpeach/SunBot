@@ -5,8 +5,8 @@ using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Threading.Tasks;
 using SunBot.Services;
-using Discord.Audio;
 using System.Linq;
+using SunBot.Util;
 
 namespace SunBot
 {
@@ -17,17 +17,15 @@ namespace SunBot
         public async Task MainAsync()
         {
             using var services = ConfigureServices();
-            var config = services.GetRequiredService<IConfiguration>();
-
-            if (config.Bot == null)
+            if (services == null)
             {
-                Console.Write("Press any key to continue..");
+                Console.WriteLine("Press any key to continue..");
                 Console.ReadKey();
                 return;
             }
-
+            
+            var config = services.GetRequiredService<Configuration>();
             var client = services.GetRequiredService<DiscordSocketClient>();
-            client.GuildAvailable += config.InitializeDefaultChannel;
 
             await client.LoginAsync(TokenType.Bot, config.Bot.Token);
             await client.StartAsync();
@@ -39,36 +37,24 @@ namespace SunBot
 
         private ServiceProvider ConfigureServices()
         {
+            var config = new Configuration();
+            if (config.Bot == null) return null;
+
             var client = new DiscordSocketClient(new DiscordSocketConfig
             {
                 ExclusiveBulkDelete = true
             });
-            client.Log += Log;
-            client.UserJoined += AnnounceUserJoined;
-
+            var commandService = new CommandService();
+            Logger.InitializeLogging(client, commandService);
+            config.InitializeClient(client);
+            
             return new ServiceCollection()
-                .AddSingleton<IConfiguration, Configuration>()
-                .AddSingleton<CommandService>()
+                .AddSingleton(config)
+                .AddSingleton(client)
+                .AddSingleton(commandService)
                 .AddSingleton<CommandHandler>()
-                .AddSingleton<DiscordSocketClient>(client)
                 .AddSingleton<AudioService>()
                 .BuildServiceProvider();
-        }
-
-        private Task Log(LogMessage msg)
-        {
-            Console.WriteLine(msg.ToString());
-            return Task.CompletedTask;
-        }
-
-        private Task AnnounceUserJoined(SocketGuildUser user)
-        {
-            var defaultChannel = user.Guild.TextChannels.FirstOrDefault(x => x.Name == "general");
-
-            if (defaultChannel == null) defaultChannel = user.Guild.DefaultChannel;
-
-            defaultChannel.SendMessageAsync($"Welcome to {user.Guild.Name}, {user.Mention}!");
-            return Task.CompletedTask;
         }
     }
 }

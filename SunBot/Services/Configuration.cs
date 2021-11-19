@@ -9,7 +9,10 @@ using System.Threading.Tasks;
 
 namespace SunBot.Services
 {
-    public class Configuration : IConfiguration
+    /// <summary>
+    /// Client configuration and util events
+    /// </summary>
+    public class Configuration
     {
         public Bot Bot { get; set; }
         public SocketTextChannel DefaultTextChannel { get; set; }
@@ -27,8 +30,22 @@ namespace SunBot.Services
                                   $"Exception message: {ex.Message}");
             }
         }
+        
+        public void WriteToAppSettings()
+        {
+            var json = JsonConvert.SerializeObject(Bot);
 
-        public Task InitializeDefaultChannel(SocketGuild guild)
+            if (File.Exists("appsettings.json")) File.WriteAllText("appsettings.json", json);
+        }
+
+        public void InitializeClient(DiscordSocketClient client)
+        {
+            client.GuildAvailable += InitializeDefaultChannel;
+            client.UserJoined += AnnounceUserJoined;
+        }
+
+
+        private Task InitializeDefaultChannel(SocketGuild guild)
         {
             DefaultTextChannel = guild.TextChannels.FirstOrDefault(x => x.Id == Bot.DefaultTextChannelId);
             if (DefaultTextChannel == null) DefaultTextChannel = guild.DefaultChannel;
@@ -36,11 +53,9 @@ namespace SunBot.Services
             return Task.CompletedTask;
         }
 
-        public void SaveToAppSettings()
+        private async Task AnnounceUserJoined(SocketGuildUser user)
         {
-            var json = JsonConvert.SerializeObject(Bot);
-
-            if (File.Exists("appsettings.json")) File.WriteAllText("appsettings.json", json);
+            await DefaultTextChannel.SendMessageAsync($"Welcome to {user.Guild.Name}, {user.Mention}!");
         }
     }
 }

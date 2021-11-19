@@ -11,12 +11,12 @@ namespace SunBot.Modules
 {
     public class HelpModule : ModuleBase<SocketCommandContext>
     {
-        private IConfiguration _config;
+        private Configuration _config;
         private CommandService _commandService;
 
         public HelpModule(IServiceProvider services)
         {
-            _config = services.GetRequiredService<IConfiguration>();
+            _config = services.GetRequiredService<Configuration>();
             _commandService = services.GetRequiredService<CommandService>();
         }
 

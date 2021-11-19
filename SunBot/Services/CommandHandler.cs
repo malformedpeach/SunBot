@@ -13,14 +13,14 @@ namespace SunBot.Services
     {
         private readonly DiscordSocketClient _client;
         private readonly CommandService _commands;
-        private readonly IConfiguration _config;
+        private readonly Configuration _config;
         private readonly IServiceProvider _services;
 
         public CommandHandler(IServiceProvider services)
         {
             _client = services.GetRequiredService<DiscordSocketClient>();
             _commands = services.GetRequiredService<CommandService>();
-            _config = services.GetRequiredService<IConfiguration>();
+            _config = services.GetRequiredService<Configuration>();
             _services = services;
         }
 

@@ -14,7 +14,7 @@ namespace SunBot.Modules
 {
     public class AdminModule : ModuleBase<SocketCommandContext>
     {
-        public IConfiguration Config { get; set; }
+        public Configuration Config { get; set; }
 
 
         [Command("say", RunMode = RunMode.Async)]
@@ -71,7 +71,7 @@ namespace SunBot.Modules
             else
             {
                 Config.DefaultTextChannel = channel;
-                Config.SaveToAppSettings();
+                Config.WriteToAppSettings();
             }
         }
 
@@ -83,7 +83,7 @@ namespace SunBot.Modules
             if (char.TryParse(prefix, out char newPrefix))
             {
                 Config.Bot.Prefix = newPrefix;
-                Config.SaveToAppSettings();
+                Config.WriteToAppSettings();
             }
             else
             {

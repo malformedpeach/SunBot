@@ -15,14 +15,14 @@ namespace SunBot.Services
 {
     public class AudioService
     {
-        private IConfiguration _config;
+        private Configuration _config;
         private IAudioClient _audioClient;
         private CancellationTokenSource _tokenSource;
         private Song _currentSong;
         private Queue<Song> _songQueue = new Queue<Song>();
         private bool _playing = false;
 
-        public AudioService(IConfiguration config)
+        public AudioService(Configuration config)
         {
             _config = config;
         }

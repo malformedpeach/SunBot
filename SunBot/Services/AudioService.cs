@@ -46,8 +46,11 @@ namespace SunBot.Services
 
         public async Task LeaveVoiceChannelAsync()
         {
+            if (_audioClient?.ConnectionState == ConnectionState.Disconnecting ||
+                _audioClient?.ConnectionState == ConnectionState.Disconnected) 
+                return;
+
             _playing = false;
-            _tokenSource.Cancel();
             await _audioClient.StopAsync();
         }
         
@@ -57,36 +60,39 @@ namespace SunBot.Services
                 _audioClient?.ConnectionState == ConnectionState.Disconnected)
             {
                 await JoinVoiceChannelAsync(voiceChannel);
+
+                if (_audioClient == null || 
+                    _audioClient?.ConnectionState == ConnectionState.Disconnected ||
+                    _audioClient?.ConnectionState == ConnectionState.Disconnecting) return;
             }
 
-
-            if (_playing)
+            if (!string.IsNullOrEmpty(songUrl))
             {
                 Song song = await GetHighestBitrateUrlAsync(songUrl);
                 _songQueue.Enqueue(song);
 
-                var embed = new EmbedBuilder();
-                embed.Description = $"Queued: [{song.Title}]({song.OriginalUrl})";
-                embed.Color = Color.Gold;
+                var embed = new EmbedBuilder
+                {
+                    Description = $"Queued: [{song.Title}]({song.OriginalUrl})",
+                    Color = Color.Gold
+                };
                 await _config.DefaultTextChannel.SendMessageAsync(embed: embed.Build());
             }
-            else if (!_playing && !string.IsNullOrEmpty(songUrl))
-            {
-                _playing = true;
-                Song song = await GetHighestBitrateUrlAsync(songUrl);
-                _songQueue.Enqueue(song);
 
-                await ProcessQueueAsync();
-            }
-            else if (!_playing && string.IsNullOrEmpty(songUrl))
+            if(!_playing)
             {
                 _playing = true;
                 await ProcessQueueAsync();
             }
         }
-        
+
         public async Task StopSongAsync()
         {
+            if (!_playing) return;
+
+            _playing = false;
+            _tokenSource.Cancel();
+
             var embed = new EmbedBuilder
             {
                 Description = "Stopping playback",
@@ -94,19 +100,22 @@ namespace SunBot.Services
             };
 
             await _config.DefaultTextChannel.SendMessageAsync(embed: embed.Build());
-            _playing = false;
-            _tokenSource.Cancel();
         }
 
         public async Task SkipSongAsync()
         {
-            var embed = new EmbedBuilder
+            if (!_playing) return; // Skip songs when playback is stopped?
+
+            if (!_tokenSource.IsCancellationRequested)
             {
-                Description = $"Skipping: [{_currentSong.Title}]({_currentSong.OriginalUrl})",
-                Color = Color.Red
-            };
-            await _config.DefaultTextChannel.SendMessageAsync(embed: embed.Build());
-            _tokenSource.Cancel();
+                _tokenSource.Cancel();
+                var embed = new EmbedBuilder
+                {
+                    Description = $"Skipping: [{_currentSong.Title}]({_currentSong.OriginalUrl})",
+                    Color = Color.Red
+                };
+                await _config.DefaultTextChannel.SendMessageAsync(embed: embed.Build());
+            }
         }
 
         public async Task GetCurrentQueue()
@@ -122,7 +131,7 @@ namespace SunBot.Services
             {
                 var builder = new StringBuilder();
                 var currentQueue = _songQueue.ToArray();
-
+                
                 if(_playing)
                 {
                     builder.AppendLine($"Currently playing: [{_currentSong.Title}]({_currentSong.OriginalUrl})");
@@ -184,10 +193,16 @@ namespace SunBot.Services
                 _tokenSource = new CancellationTokenSource();
                 var cancellationToken = _tokenSource.Token;
 
-                _currentSong = _songQueue.Dequeue();
+                var dequeueSuccess = _songQueue.TryDequeue(out _currentSong);
+                if (!dequeueSuccess) 
+                {
+                    Console.WriteLine("ProcessQueueAsync: Error when dequeuing song");
+                    return;
+                }
 
-                using var mediaReader = new MediaFoundationReader(_currentSong.AudioUrl);
-                using var outputStream = _audioClient.CreatePCMStream(AudioApplication.Music);
+                await using var mediaReader = new MediaFoundationReader(_currentSong.AudioUrl);
+                await using var outputStream = _audioClient.CreatePCMStream(AudioApplication.Music);
+
                 try
                 {
                     var embed = new EmbedBuilder
@@ -202,7 +217,7 @@ namespace SunBot.Services
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"AudioService.ProcessQueue: {ex.Message}");
+                    Console.WriteLine($"AudioService.ProcessQueueAsync: {ex.Message}");
                 }
                 finally
                 {
@@ -210,8 +225,7 @@ namespace SunBot.Services
                 }
             }
 
-            _playing = false;
-            if (_songQueue.Count == 0)
+            if (_songQueue.Count == 0 && _playing)
             {
                 var embed = new EmbedBuilder
                 {
@@ -219,6 +233,8 @@ namespace SunBot.Services
                     Color = Color.Red,
                 };
                 await _config.DefaultTextChannel.SendMessageAsync(embed: embed.Build());
+                
+                _playing = false;
             }
         }
     }

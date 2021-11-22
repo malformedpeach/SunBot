@@ -54,6 +54,7 @@ namespace SunBot
                 .AddSingleton(commandService)
                 .AddSingleton<CommandHandler>()
                 .AddSingleton<AudioService>()
+                .AddSingleton<BlackjackService>()
                 .BuildServiceProvider();
         }
     }

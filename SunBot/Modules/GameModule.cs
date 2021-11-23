@@ -1,10 +1,6 @@
-﻿using Discord;
-using Discord.Commands;
+﻿using Discord.Commands;
+using SunBot.Models.Enums;
 using SunBot.Services;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace SunBot.Modules
@@ -13,20 +9,36 @@ namespace SunBot.Modules
     {
         public BlackjackService Service { get; set; } 
 
-
         [Command("blackjack")]
-        [Summary("Start a game of blackjack")]
-        public async Task BlackJackAsync()
+        [Summary("Start a game of blackjack!")] // TODO: v fix this summary
+        public async Task BlackJackAsync([Summary("Start/Hit/Stand")][Remainder]string action = "")
         {
-            Card card = Service.DrawCard();
-            var suit = card.Suit.ToString().ToLower();
-            var embed = new EmbedBuilder
+            if (action.ToLower() == BlackjackAction.Start.ToString().ToLower())
             {
-                Title = "Testing!",
-                Description = $"You drew: {card.Rank} of {card.Suit}"
-            };
+                // Shuffle deck and deal initial hand
+                Service.StartGameAsync();
+            }
+            else if (action.ToLower() == BlackjackAction.Hit.ToString().ToLower())
+            {
+                // Deal card to player, check if bust
+                Service.HitAsync();
+            }
+            else if (action.ToLower() == BlackjackAction.Stand.ToString().ToLower())
+            {
+                // Begin drawing cards for dealer
+                Service.StandAsync();
+            }
+            else
+            {
+                await ReplyAsync("Please provide an action when using this command.\n" +
+                                 "Use the `help` command for more info!");
+            }
+        }
 
-            await ReplyAsync(embed: embed.Build());
+        [Command("foo")]
+        public async Task Foo()
+        {
+            Service.Foo();
         }
     }
 }

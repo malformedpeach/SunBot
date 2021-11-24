@@ -11,28 +11,9 @@ namespace SunBot.Modules
 
         [Command("blackjack")]
         [Summary("Start a game of blackjack!")] // TODO: v fix this summary
-        public async Task BlackJackAsync([Summary("Start/Hit/Stand")][Remainder]string action = "")
+        public async Task BlackJackAsync()
         {
-            if (action.ToLower() == BlackjackAction.Start.ToString().ToLower())
-            {
-                // Shuffle deck and deal initial hand
-                Service.StartGameAsync();
-            }
-            else if (action.ToLower() == BlackjackAction.Hit.ToString().ToLower())
-            {
-                // Deal card to player, check if bust
-                Service.HitAsync();
-            }
-            else if (action.ToLower() == BlackjackAction.Stand.ToString().ToLower())
-            {
-                // Begin drawing cards for dealer
-                Service.StandAsync();
-            }
-            else
-            {
-                await ReplyAsync("Please provide an action when using this command.\n" +
-                                 "Use the `help` command for more info!");
-            }
+            Service.StartGameAsync(Context.User);
         }
 
         [Command("foo")]

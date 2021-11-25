@@ -108,13 +108,14 @@ namespace SunBot.Services
 
             if (!_tokenSource.IsCancellationRequested)
             {
-                _tokenSource.Cancel();
                 var embed = new EmbedBuilder
                 {
                     Description = $"Skipping: [{_currentSong.Title}]({_currentSong.OriginalUrl})",
                     Color = Color.Red
                 };
                 await _config.DefaultTextChannel.SendMessageAsync(embed: embed.Build());
+                
+                _tokenSource.Cancel();
             }
         }
 

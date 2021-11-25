@@ -11,15 +11,12 @@ namespace SunBot.Modules
 
         [Command("blackjack")]
         [Summary("Start a game of blackjack!")] // TODO: v fix this summary
-        public async Task BlackJackAsync()
+        public async Task BlackJackAsync([Summary("start/join")]string action)
         {
-            Service.StartGameAsync(Context.User);
-        }
-
-        [Command("foo")]
-        public async Task Foo()
-        {
-            Service.Foo();
+            if (action == "start")
+                Service.StartGameAsync();
+            else if (action == "join")
+                Service.JoinTable(Context.User);
         }
     }
 }

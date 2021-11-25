@@ -17,30 +17,26 @@ using ImageFormat = System.Drawing.Imaging.ImageFormat;
 
 namespace SunBot.Services
 {
-    
-
     public class BlackjackService
     {
-        // TODO: 'Game' class
         private List<Card> _dealerCards;
-        private List<Card> _playerCards;
         private List<int> _playingDeck;
-        private int _playerPoints;
         private int _dealerPoints;
         private int _cardsDrawnCount = 0;
-
-        //private ulong _playerId;
-        private SocketUser _user;
         private GameState _gameState = GameState.End;
+
 
         // members
         private static int IMAGE_HEIGHT = 325;
         private static int IMAGE_WIDTH = 245;
+        private static int PLAYER_CAPACITY = 2;
         private static string FACE_DOWN_CARD = "Resources/PNGCards/face_down.png";
         private static Emoji HIT_EMOJI = new Emoji("👍");
         private static Emoji STAND_EMOJI = new Emoji("✋");
 
-        //private List<BlackjackGame> _games;
+
+
+        private List<BlackjackPlayer> _players;
         private List<int> _initialDeck;
         private Configuration _config;
         private DiscordSocketClient _client;
@@ -56,31 +52,42 @@ namespace SunBot.Services
             client.ReactionAdded += React;
 
             _initialDeck = new List<int>();
-            for(int i = 1; i < 53; i++)
+            for (int i = 1; i < 53; i++)
             {
                 _initialDeck.Add(i);
             }
+
+            _players = new List<BlackjackPlayer>();
         }
 
-        public async void StartGameAsync(SocketUser user)
+
+        #region Commands
+
+        public async void StartGameAsync()
         {
-            if (_gameState == GameState.Playing) // _playing
+            if (_players.Count == 0)
             {
-                await _config.DefaultTextChannel.SendMessageAsync($"Game running: {_user.Username} is hogging the seat!");
+                await _config.DefaultTextChannel.SendMessageAsync("No players at the table!");
                 return;
             }
 
-            //_playing = true;
+            if (_gameState == GameState.Playing) // _playing
+            {
+                await _config.DefaultTextChannel.SendMessageAsync($"A game is currently in progress.");
+                return;
+            }
+
             _gameState = GameState.Playing;
-            //_playerId = playerId;
-            _user = user;
-            
 
             ShuffleDeck();
             await _config.DefaultTextChannel.SendMessageAsync("Deck shuffled, let's play some cards!");
 
-            // Reset player hand
-            _playerCards = new List<Card>();
+            // Reset players hands
+            foreach (var player in _players)
+            {
+                player.Cards = new List<Card>();
+                player.State = PlayerState.Playing;
+            }
 
             // Reset dealer hand
             _dealerCards = new List<Card>();
@@ -90,35 +97,105 @@ namespace SunBot.Services
             SendActionResult();
         }
 
-        public void Hit()
+        public async void JoinTable(SocketUser user)
         {
-            if (_gameState == GameState.End) // !_playing
+            // if game is already running, prevent join
+            if (_gameState == GameState.Playing)
             {
+                await _config.DefaultTextChannel.SendMessageAsync("Can't join a game in progress.");
                 return;
             }
 
-            // Draw card
-            _playerCards.Add(DrawCard());
-            _playerPoints = _playerCards.Sum(x => x.Value);
-            if (_playerPoints > 21) _gameState = GameState.End;
+            // if player is already in game, prevent join
+            if (_players.Any(x => x.User == user))
+            {
+                await _config.DefaultTextChannel.SendMessageAsync("You already joined!");
+                return;
+            }
 
-            // Send card composite
-            SendActionResult();
+
+            if (_players.Count == PLAYER_CAPACITY)
+                await _config.DefaultTextChannel.SendMessageAsync("No seats available! :(");
+            else
+            {
+                var newPlayer = new BlackjackPlayer
+                {
+                    State = PlayerState.Playing,
+                    User = user,
+                    Cards = new List<Card>()
+                };
+                _players.Add(newPlayer);
+                await _config.DefaultTextChannel.SendMessageAsync("Joined table!");
+
+                // Show players
+            }
         }
 
-        public void Stand()
+        #endregion
+
+
+        #region Player actions
+        private void Hit(BlackjackPlayer currentPlayer)
         {
             if (_gameState == GameState.End) // !_playing
             {
                 return;
             }
+            else if (currentPlayer.State == PlayerState.Playing)
+            {
+                currentPlayer.State = PlayerState.Hit;
+                Update();
+            }
+        }
 
-            // Draw cards according to the rulesthingamajig
-            //_playerStand = true;
-            _gameState = GameState.PlayerStand;
+        private void Stand(BlackjackPlayer currentPlayer)
+        {
+            if (_gameState == GameState.End) // !_playing
+            {
+                return;
+            }
+            else if (currentPlayer.State == PlayerState.Playing)
+            {
+                currentPlayer.State = PlayerState.Stand;
+                Update();
+            }
+        }
 
-            // Process stand
-            ProcessStand();
+        #endregion
+
+
+        #region Update logic and result 
+
+        private async void Update()
+        {
+            // Do update logic if all players have made their moves
+            if (_players.All(x => x.State != PlayerState.Playing))
+            {
+                foreach (var player in _players)
+                {
+                    if (player.State == PlayerState.Hit)
+                    {
+                        player.Cards.Add(DrawCard());
+
+                        if (player.Points > 21)
+                            player.State = PlayerState.Bust;
+
+                        else
+                            player.State = PlayerState.Playing;
+                    }
+                }
+
+
+                if (_players.All(x => x.State >= PlayerState.Stand))
+                {
+                    _gameState = GameState.PlayerStand;
+                    ProcessStand();
+                }
+                else
+                {
+                    SendActionResult();
+                }
+            }
         }
 
         private async void ProcessStand()
@@ -127,21 +204,29 @@ namespace SunBot.Services
             {
                 _dealerPoints = _dealerCards.Sum(x => x.Value);
 
-                if (_dealerPoints < 17 && _dealerPoints < _playerPoints)
+                if (_dealerPoints < 17)
                 {
-                    // Draw card
-                    _dealerCards.Add(DrawCard());
-                    _dealerPoints = _dealerCards.Sum(x => x.Value);
+                    foreach (var player in _players)
+                    {
+                        if (_dealerPoints > player.Points)
+                            continue;
+                        else
+                        {
+                            // Draw card
+                            _dealerCards.Add(DrawCard());
+                            _dealerPoints = _dealerCards.Sum(x => x.Value);
 
-                    // report progress to player
-                    SendActionResult();
+                            // report progress to player
+                            SendActionResult();
 
-                    // wait
-                    await Task.Delay(3000);
+                            // wait
+                            await Task.Delay(3000);
+                        }
+                    }
+
                 }
                 else // bust or satisfied with cards
                 {
-                    //_dealerStand = true;
                     _gameState = GameState.End;
                     SendActionResult();
                 }
@@ -151,33 +236,25 @@ namespace SunBot.Services
         private async void SendActionResult()
         {
             StringBuilder builder = new StringBuilder();
-            
-            // Player cards and points
-            builder.AppendLine("**Your cards**");
-            foreach (var card in _playerCards)
-            {
-                builder.AppendLine($"{card.Rank} of {card.Suit} = {card.Value}");
-            }
-            builder.AppendLine($"Player points: {_playerPoints}");
-            // -----------------------
+
 
             // Dealer cards and points
             builder.AppendLine("**Dealer cards**");
-            
-            for(int i = 0; i < _dealerCards.Count; i++)
-            {
-                var card = _dealerCards[i];
 
-                if (_gameState == GameState.Playing && i == 0)
-                {
-                    builder.AppendLine($"Face down card = ?");
-                }
-                else
-                {
-                    builder.AppendLine($"{card.Rank} of {card.Suit} = {card.Value}");
-                }
-            }
-            
+            //for (int i = 0; i < _dealerCards.Count; i++)
+            //{
+            //    var card = _dealerCards[i];
+
+            //    if (_gameState == GameState.Playing && i == 0)
+            //    {
+            //        builder.AppendLine($"Face down card = ?");
+            //    }
+            //    else
+            //    {
+            //        builder.AppendLine($"{card.Rank} of {card.Suit} = {card.Value}");
+            //    }
+            //}
+
             if (_gameState == GameState.Playing)
             {
                 builder.AppendLine($"Dealer points: {_dealerCards[1].Value}");
@@ -185,17 +262,45 @@ namespace SunBot.Services
             else builder.AppendLine($"Dealer points: {_dealerPoints}");
             // -----------------------
 
+
+            // Player cards and points
+            foreach (var player in _players)
+            {
+                builder.AppendLine($"{player.User.Mention} **{player.State}**");
+                //foreach (var card in player.Cards)
+                //{
+                //    builder.AppendLine($"{card.Rank} of {card.Suit} = {card.Value}");
+                //}
+                builder.AppendLine($"Total points: {player.Points}");
+            }
+            // -----------------------
+            
+
             builder.AppendLine(); // padding line
 
             // Gamestate
             if (_gameState == GameState.End)
             {
                 // report result
-                if (_playerPoints > 21) builder.AppendLine("**Bust! House wins :^)**");
-                else if (_dealerPoints > 21) builder.AppendLine("**Bust! You win :^)**");
-                else if (_playerPoints > _dealerPoints) builder.AppendLine("**Your hand wins! :^)**");
-                else if (_dealerPoints > _playerPoints) builder.AppendLine("**House hand wins! :^)**");
-                else if (_dealerPoints == _playerPoints) builder.AppendLine("**Push! refunds galore! :^)**");
+                builder.AppendLine("**Results!**");
+
+                foreach (var player in _players)
+                {
+                    if (player.Points > 21) 
+                        builder.AppendLine($"{player.User.Mention} **Bust! House wins :^)**");
+
+                    else if (_dealerPoints > 21) 
+                        builder.AppendLine($"{player.User.Mention} **Bust! You win :^)**");
+
+                    else if (player.Points > _dealerPoints) 
+                        builder.AppendLine($"{player.User.Mention} **Your hand wins! :^)**");
+
+                    else if (player.Points < _dealerPoints) 
+                        builder.AppendLine($"{player.User.Mention} **House hand wins! :^)**");
+
+                    else if (player.Points == _dealerPoints) 
+                        builder.AppendLine($"{player.User.Mention} **Push! refunds galore! :^)**");
+                }
             }
             else if (_gameState == GameState.PlayerStand)
             {
@@ -219,24 +324,39 @@ namespace SunBot.Services
             };
 
             await using MemoryStream memoryStream = CreateCardImageMemoryStream();
+
+            if (_theMessage != null)
+            {
+                await _theMessage.DeleteAsync();
+            }
             _theMessage = await _config.DefaultTextChannel.SendFileAsync(memoryStream, "myimage.png", "", embed: embed.Build());
-            await _theMessage.AddReactionAsync(HIT_EMOJI);
-            await _theMessage.AddReactionAsync(STAND_EMOJI);
+
+            if (_gameState == GameState.Playing)
+            {
+                await _theMessage.AddReactionAsync(HIT_EMOJI);
+                await _theMessage.AddReactionAsync(STAND_EMOJI);
+            }
         }
 
+        #endregion
+        
 
+        #region Deck functions
 
         private void InitialDeal()
         {
-            _playerPoints = 0;
+            // reset points
             _dealerPoints = 0;
 
-            _playerCards.Add(DrawCard());
-            _dealerCards.Add(DrawCard());
-            _playerCards.Add(DrawCard());
-            _dealerCards.Add(DrawCard());
-
-            _playerPoints = _playerCards.Sum(x => x.Value);
+            // Initial card draws
+            for (int i = 0; i < 2; i++)
+            {
+                foreach (var player in _players)
+                {
+                    player.Cards.Add(DrawCard());
+                }
+                _dealerCards.Add(DrawCard());
+            }
             _dealerPoints = _dealerCards.Sum(x => x.Value);
         }
 
@@ -258,37 +378,76 @@ namespace SunBot.Services
 
             float cardValue = _playingDeck[_cardsDrawnCount];
             Card card = new Card(cardValue);
-            
+
             _cardsDrawnCount++;
 
             return card;
         }
-    
+
+        #endregion
+
+
+
+
         private MemoryStream CreateCardImageMemoryStream()
         {
-            int highestCardCount = _playerCards.Count > _dealerCards.Count ? _playerCards.Count : _dealerCards.Count;
-            using Bitmap compositeBitmap = new Bitmap(IMAGE_WIDTH * highestCardCount, IMAGE_HEIGHT * 2);
-            using Graphics canvas = Graphics.FromImage(compositeBitmap);
+            //int highestCardCount = _playerCards.Count > _dealerCards.Count ? _playerCards.Count : _dealerCards.Count;
 
-            for (int i = 0; i < _playerCards.Count; i++)
+            // Determine card count (width of composite img)
+            var highestPlayerCardCount = 0;
+
+            foreach (var player in _players)
             {
-                using Image image = Image.FromFile(_playerCards[i].LocalImageUrl);
-                canvas.DrawImage(image, new Point(IMAGE_WIDTH * i, 0));
+                if (player.Cards.Count > highestPlayerCardCount)
+                    highestPlayerCardCount = player.Cards.Count;
             }
 
+            int highestCardCount = _dealerCards.Count > highestPlayerCardCount ? 
+                _dealerCards.Count : highestPlayerCardCount;
+
+            // determine player count (height of composite img)
+            int playerCount = _players.Count + 1; // + 1 (dealer)
+
+            // create bitmap with size values
+            using Bitmap compositeBitmap = new Bitmap(IMAGE_WIDTH * highestCardCount, IMAGE_HEIGHT * playerCount);
+            using Graphics canvas = Graphics.FromImage(compositeBitmap);
+
+            // draw dealer hand
             for (int i = 0; i < _dealerCards.Count; i++)
             {
                 if (i == 0 && _gameState == GameState.Playing)
                 {
                     using Image image = Image.FromFile(FACE_DOWN_CARD);
-                    canvas.DrawImage(image, new Point(IMAGE_WIDTH * i, IMAGE_HEIGHT));
+                    canvas.DrawImage(image, new Point(IMAGE_WIDTH * i, 0));
                 }
                 else
                 {
                     using Image image = Image.FromFile(_dealerCards[i].LocalImageUrl);
-                    canvas.DrawImage(image, new Point(IMAGE_WIDTH * i, IMAGE_HEIGHT));
+                    canvas.DrawImage(image, new Point(IMAGE_WIDTH * i, 0));
                 }
             }
+
+            // draw players hands
+            for (int x = 0; x < _players.Count; x++)
+            {
+                for (int y = 0; y < _players[x].Cards.Count; y++)
+                {
+                    using Image image = Image.FromFile(_players[x].Cards[y].LocalImageUrl);
+                    canvas.DrawImage(image, new Point(IMAGE_WIDTH * y, IMAGE_HEIGHT * (x + 1)));
+                }
+            }
+            //for (int i = 0; i < _playerCards.Count; i++)
+            //{
+            //    using Image image = Image.FromFile(_playerCards[i].LocalImageUrl);
+            //    canvas.DrawImage(image, new Point(IMAGE_WIDTH * i, 0));
+            //}
+
+            // TEXT TESTING
+            //Font font = new Font("Arial", 20.0f);
+            //SolidBrush brush = new SolidBrush(System.Drawing.Color.Red);
+            //canvas.DrawString("foobar!", font, brush, new PointF(0, 0));
+            // ------------
+
 
             canvas.Save();
             MemoryStream memoryStream = new MemoryStream();
@@ -298,57 +457,15 @@ namespace SunBot.Services
             return memoryStream;
         }
 
-
-
-
         // Testing
-        public async void Foo()
-        {
-            ShuffleDeck();
-            List<Card> cardList = new List<Card>();
-
-            for(int i = 0; i < 10; i++)
-            {
-                cardList.Add(DrawCard());
-            }
-
-            //using Image firstImage = Image.FromFile(cardList[0].LocalImageUrl);
-            using Bitmap compositeBitmap = new Bitmap(IMAGE_WIDTH * cardList.Count, IMAGE_HEIGHT);
-            using Graphics canvas = Graphics.FromImage(compositeBitmap);
-
-            // Compose image
-            for (int i = 0; i < cardList.Count; i++)
-            {
-                using Image image = Image.FromFile(cardList[i].LocalImageUrl);
-                canvas.DrawImage(image, new Point(IMAGE_WIDTH * i, 0));
-            }
-            canvas.Save();
-
-            // load image into memory stream
-            await using MemoryStream memoryStream = new MemoryStream();
-            compositeBitmap.Save(memoryStream, ImageFormat.Png);
-
-            var embed = new EmbedBuilder
-            {
-                Title = "Testing!",
-                Description = $"Composite image test",
-                ImageUrl = "attachment://myimage.png"
-            };
-
-            // 'Rewind' stream and send
-            memoryStream.Position = 0;
-            _theMessage = await _config.DefaultTextChannel.SendFileAsync(memoryStream, "myimage.png", "foobar", embed: embed.Build());
-            await _theMessage.AddReactionAsync(HIT_EMOJI);
-            await _theMessage.AddReactionAsync(STAND_EMOJI);
-        }
-
         public async Task React(Cacheable<IUserMessage, ulong> cacheable, ISocketMessageChannel channel, SocketReaction reaction)
         {
             if (reaction.User.Value.IsBot) return;
-            else if (reaction.User.Value.Id == _user.Id)
+            else if (_players.Any(x => x.User.Id == reaction.User.Value.Id))
             {
-                if (reaction.Emote.Name == HIT_EMOJI.Name) Hit();
-                else if (reaction.Emote.Name == STAND_EMOJI.Name) Stand();
+                var player = _players.First(x => x.User.Id == reaction.User.Value.Id);
+                if (reaction.Emote.Name == HIT_EMOJI.Name) Hit(player);
+                else if (reaction.Emote.Name == STAND_EMOJI.Name) Stand(player);
             }
         }
     }

@@ -11,7 +11,6 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-// TODO: Seperate class for image related stuff?
 using Image = System.Drawing.Image;
 using ImageFormat = System.Drawing.Imaging.ImageFormat;
 
@@ -29,10 +28,12 @@ namespace SunBot.Services
         // members
         private static int IMAGE_HEIGHT = 325;
         private static int IMAGE_WIDTH = 245;
-        private static int PLAYER_CAPACITY = 2;
+        private static int PLAYER_CAPACITY = 6;
         private static string FACE_DOWN_CARD = "Resources/PNGCards/face_down.png";
         private static Emoji HIT_EMOJI = new Emoji("👍");
         private static Emoji STAND_EMOJI = new Emoji("✋");
+        private static Emoji PLAY_AGAIN_EMOJI = new Emoji("✔️");
+        private static Emoji LEAVE_TABLE_EMOJI = new Emoji("❌");
 
 
 
@@ -131,6 +132,30 @@ namespace SunBot.Services
             }
         }
 
+        public async void LeaveTable(ulong userId)
+        {
+            if (_players.Any(x => x.User.Id == userId))
+            {
+                _players.RemoveAt(_players.FindIndex(x => x.User.Id == userId));
+                await _config.DefaultTextChannel.SendMessageAsync("Left table!");
+            }
+            else
+            {
+                await _config.DefaultTextChannel.SendMessageAsync("Not at the table.");
+            }
+        }
+
+        public async void ClearTable()
+        {
+            _players.Clear();
+            await _config.DefaultTextChannel.SendMessageAsync("Table cleared!");
+        }
+
+        public async void GetRules()
+        {
+            await _config.DefaultTextChannel.SendMessageAsync("[Rules here]");
+        }
+
         #endregion
 
 
@@ -166,9 +191,8 @@ namespace SunBot.Services
 
         #region Update logic and result 
 
-        private async void Update()
+        private void Update()
         {
-            // Do update logic if all players have made their moves
             if (_players.All(x => x.State != PlayerState.Playing))
             {
                 foreach (var player in _players)
@@ -200,30 +224,38 @@ namespace SunBot.Services
 
         private async void ProcessStand()
         {
+            int highestPlayerScore = 0;
+            
+            foreach (var player in _players)
+            {
+                if (player.Points > highestPlayerScore && player.Points < 21) 
+                    highestPlayerScore = player.Points;
+            }
+
+            // Reveal down card
+            SendActionResult();
+            await Task.Delay(5000);
+
             while (_gameState == GameState.PlayerStand)
             {
                 _dealerPoints = _dealerCards.Sum(x => x.Value);
 
-                if (_dealerPoints < 17)
+                if (_players.All(x => x.State == PlayerState.Bust))
                 {
-                    foreach (var player in _players)
-                    {
-                        if (_dealerPoints > player.Points)
-                            continue;
-                        else
-                        {
-                            // Draw card
-                            _dealerCards.Add(DrawCard());
-                            _dealerPoints = _dealerCards.Sum(x => x.Value);
+                    _gameState = GameState.End;
+                    SendActionResult();
+                }
+                else if (_dealerPoints < 17 && _dealerPoints < highestPlayerScore)
+                {
+                    //Draw card
+                    _dealerCards.Add(DrawCard());
+                    _dealerPoints = _dealerCards.Sum(x => x.Value);
 
-                            // report progress to player
-                            SendActionResult();
+                    // report progress to player
+                    SendActionResult();
 
-                            // wait
-                            await Task.Delay(3000);
-                        }
-                    }
-
+                    // wait
+                    await Task.Delay(5000);
                 }
                 else // bust or satisfied with cards
                 {
@@ -237,69 +269,33 @@ namespace SunBot.Services
         {
             StringBuilder builder = new StringBuilder();
 
-
-            // Dealer cards and points
-            builder.AppendLine("**Dealer cards**");
-
-            //for (int i = 0; i < _dealerCards.Count; i++)
-            //{
-            //    var card = _dealerCards[i];
-
-            //    if (_gameState == GameState.Playing && i == 0)
-            //    {
-            //        builder.AppendLine($"Face down card = ?");
-            //    }
-            //    else
-            //    {
-            //        builder.AppendLine($"{card.Rank} of {card.Suit} = {card.Value}");
-            //    }
-            //}
-
-            if (_gameState == GameState.Playing)
-            {
-                builder.AppendLine($"Dealer points: {_dealerCards[1].Value}");
-            }
-            else builder.AppendLine($"Dealer points: {_dealerPoints}");
-            // -----------------------
-
-
-            // Player cards and points
             foreach (var player in _players)
             {
-                builder.AppendLine($"{player.User.Mention} **{player.State}**");
-                //foreach (var card in player.Cards)
-                //{
-                //    builder.AppendLine($"{card.Rank} of {card.Suit} = {card.Value}");
-                //}
-                builder.AppendLine($"Total points: {player.Points}");
+                builder.AppendLine($"{player.User.Mention}: {player.Points} | **{player.State}**");
             }
-            // -----------------------
-            
 
             builder.AppendLine(); // padding line
 
-            // Gamestate
             if (_gameState == GameState.End)
             {
-                // report result
                 builder.AppendLine("**Results!**");
 
                 foreach (var player in _players)
                 {
                     if (player.Points > 21) 
-                        builder.AppendLine($"{player.User.Mention} **Bust! House wins :^)**");
+                        builder.AppendLine($"{player.User.Mention} **Bust! House wins**");
 
                     else if (_dealerPoints > 21) 
-                        builder.AppendLine($"{player.User.Mention} **Bust! You win :^)**");
+                        builder.AppendLine($"{player.User.Mention} **Bust! You win**");
 
                     else if (player.Points > _dealerPoints) 
-                        builder.AppendLine($"{player.User.Mention} **Your hand wins! :^)**");
+                        builder.AppendLine($"{player.User.Mention} **Your hand wins!**");
 
                     else if (player.Points < _dealerPoints) 
-                        builder.AppendLine($"{player.User.Mention} **House hand wins! :^)**");
+                        builder.AppendLine($"{player.User.Mention} **House hand wins!**");
 
                     else if (player.Points == _dealerPoints) 
-                        builder.AppendLine($"{player.User.Mention} **Push! refunds galore! :^)**");
+                        builder.AppendLine($"{player.User.Mention} **Push! refunds galore!**");
                 }
             }
             else if (_gameState == GameState.PlayerStand)
@@ -318,10 +314,19 @@ namespace SunBot.Services
                 Description = $"{builder}",
                 ImageUrl = "attachment://myimage.png"
             };
-            embed.Footer = new EmbedFooterBuilder
+            var footer = new EmbedFooterBuilder();
+
+            // Footer info
+            if (_gameState == GameState.End)
             {
-                Text = $"{HIT_EMOJI} Hit! | {STAND_EMOJI} Stand."
-            };
+                footer.Text = $"{PLAY_AGAIN_EMOJI} Play again! | {LEAVE_TABLE_EMOJI} Leave table.";
+            }
+            else if (_gameState == GameState.Playing)
+            {
+                footer.Text = $"{HIT_EMOJI} Hit! | {STAND_EMOJI} Stand.";
+            }
+            embed.Footer = footer;
+
 
             await using MemoryStream memoryStream = CreateCardImageMemoryStream();
 
@@ -331,6 +336,13 @@ namespace SunBot.Services
             }
             _theMessage = await _config.DefaultTextChannel.SendFileAsync(memoryStream, "myimage.png", "", embed: embed.Build());
 
+            // Add reactions
+            if (_gameState == GameState.End)
+            {
+                // play again, leave table
+                await _theMessage.AddReactionAsync(PLAY_AGAIN_EMOJI);
+                await _theMessage.AddReactionAsync(LEAVE_TABLE_EMOJI);
+            }
             if (_gameState == GameState.Playing)
             {
                 await _theMessage.AddReactionAsync(HIT_EMOJI);
@@ -343,20 +355,18 @@ namespace SunBot.Services
 
         #region Deck functions
 
-        private void InitialDeal()
+        private async void InitialDeal()
         {
             // reset points
             _dealerPoints = 0;
 
             // Initial card draws
-            for (int i = 0; i < 2; i++)
+            foreach (var player in _players)
             {
-                foreach (var player in _players)
-                {
-                    player.Cards.Add(DrawCard());
-                }
-                _dealerCards.Add(DrawCard());
+                player.Cards.Add(DrawCard());
             }
+
+            _dealerCards.Add(DrawCard());
             _dealerPoints = _dealerCards.Sum(x => x.Value);
         }
 
@@ -391,8 +401,6 @@ namespace SunBot.Services
 
         private MemoryStream CreateCardImageMemoryStream()
         {
-            //int highestCardCount = _playerCards.Count > _dealerCards.Count ? _playerCards.Count : _dealerCards.Count;
-
             // Determine card count (width of composite img)
             var highestPlayerCardCount = 0;
 
@@ -464,8 +472,14 @@ namespace SunBot.Services
             else if (_players.Any(x => x.User.Id == reaction.User.Value.Id))
             {
                 var player = _players.First(x => x.User.Id == reaction.User.Value.Id);
-                if (reaction.Emote.Name == HIT_EMOJI.Name) Hit(player);
-                else if (reaction.Emote.Name == STAND_EMOJI.Name) Stand(player);
+                if (reaction.Emote.Name == HIT_EMOJI.Name) 
+                    Hit(player);
+                else if (reaction.Emote.Name == STAND_EMOJI.Name) 
+                    Stand(player);
+                else if (reaction.Emote.Name == PLAY_AGAIN_EMOJI.Name) 
+                    StartGameAsync();
+                else if (reaction.Emote.Name == LEAVE_TABLE_EMOJI.Name) 
+                    LeaveTable(reaction.User.Value.Id);
             }
         }
     }

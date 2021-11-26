@@ -30,10 +30,6 @@ namespace SunBot.Models
             {
                 Value = 10;
             }
-            else if (Rank == CardRank.Ace)
-            {
-                Value = 11;
-            }
             else
             {
                 Value = (int)Rank;

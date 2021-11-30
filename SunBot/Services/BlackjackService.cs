@@ -19,7 +19,7 @@ namespace SunBot.Services
     public class BlackjackService
     {
         private static int IMAGE_HEIGHT = 325;
-        private static int IMAGE_WIDTH = 245;
+        private static int IMAGE_WIDTH = 230;
         private static int PLAYER_CAPACITY = 6;
         private static string FACE_DOWN_CARD = "Resources/PNGCards/face_down.png";
         
@@ -477,21 +477,28 @@ namespace SunBot.Services
             int playerCount = _players.Count + 1; // + 1 (dealer)
 
             // create bitmap with size values
-            using Bitmap compositeBitmap = new Bitmap(IMAGE_WIDTH * highestCardCount, IMAGE_HEIGHT * playerCount);
+            using Bitmap compositeBitmap = new Bitmap(IMAGE_WIDTH * highestCardCount, (IMAGE_HEIGHT + 50) * playerCount);
             using Graphics canvas = Graphics.FromImage(compositeBitmap);
+
+            // Font and brush for text
+            Font font = new Font("Arial", 30.0f);
+            SolidBrush brush = new SolidBrush(System.Drawing.Color.Gold);
+
 
             // draw dealer hand
             for (int i = 0; i < _dealerCards.Count; i++)
             {
+                canvas.DrawString("Dealer", font, brush, new PointF(0, 0));
+
                 if (i == 0 && _gameState == GameState.Playing)
                 {
                     using Image image = Image.FromFile(FACE_DOWN_CARD);
-                    canvas.DrawImage(image, new Point(IMAGE_WIDTH * i, 0));
+                    canvas.DrawImage(image, new Point(IMAGE_WIDTH * i, 50));
                 }
                 else
                 {
                     using Image image = Image.FromFile(_dealerCards[i].LocalImageUrl);
-                    canvas.DrawImage(image, new Point(IMAGE_WIDTH * i, 0));
+                    canvas.DrawImage(image, new Point(IMAGE_WIDTH * i, 50));
                 }
             }
 
@@ -500,22 +507,11 @@ namespace SunBot.Services
             {
                 for (int y = 0; y < _players[x].Cards.Count; y++)
                 {
+                    canvas.DrawString($"{_players[x].User.Username}", font, brush, new PointF(0, IMAGE_HEIGHT * (x + 1) + 50));
                     using Image image = Image.FromFile(_players[x].Cards[y].LocalImageUrl);
-                    canvas.DrawImage(image, new Point(IMAGE_WIDTH * y, IMAGE_HEIGHT * (x + 1)));
+                    canvas.DrawImage(image, new Point(IMAGE_WIDTH * y, (IMAGE_HEIGHT * (x + 1)) + 100));
                 }
             }
-            //for (int i = 0; i < _playerCards.Count; i++)
-            //{
-            //    using Image image = Image.FromFile(_playerCards[i].LocalImageUrl);
-            //    canvas.DrawImage(image, new Point(IMAGE_WIDTH * i, 0));
-            //}
-
-            // TEXT TESTING
-            //Font font = new Font("Arial", 20.0f);
-            //SolidBrush brush = new SolidBrush(System.Drawing.Color.Red);
-            //canvas.DrawString("foobar!", font, brush, new PointF(0, 0));
-            // ------------
-
 
             canvas.Save();
             MemoryStream memoryStream = new MemoryStream();

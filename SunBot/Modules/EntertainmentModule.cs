@@ -17,18 +17,24 @@ namespace SunBot.Modules
                  "**leave**: leave table.\n" +
                  "**clear**: remove all players from table.\n" +
                  "**rules**: review the rules used in this implementation.")] // TODO: v fix this summary
-        public async Task BlackJackAsync([Summary("start/join/leave/clear/rules")]string action)
+        public async Task BlackJackAsync([Summary("start/join/leave/clear/rules")]string action = "")
         {
-            if (action == "start")
-                Service.StartGameAsync();
-            else if (action == "join")
-                Service.JoinTable(Context.User);
-            else if (action == "leave")
-                Service.LeaveTable(Context.User.Id);
-            else if (action == "clear")
-                Service.ClearTable();
-            else if (action == "rules")
-                Service.GetRules();
+            if (action == "")
+            {
+                Service.StartSession();
+            }
+
+            // old
+            //if (action == "start")
+            //    Service.StartGameAsync();
+            //else if (action == "join")
+            //    Service.JoinTable(Context.User);
+            //else if (action == "leave")
+            //    Service.LeaveTable(Context.User.Id);
+            //else if (action == "clear")
+            //    Service.ClearTable();
+            //else if (action == "rules")
+            //    Service.GetRules();
         }
     }
 }

@@ -6,8 +6,10 @@ namespace SunBot.Models.Enums
 {
     public enum GameState
     {
-        End = 0,
-        Playing = 1,
-        PlayerStand = 2,
+        SessionEnded,
+        SessionStarted,
+        Playing,
+        PlayerStand,
+        End,
     }
 }

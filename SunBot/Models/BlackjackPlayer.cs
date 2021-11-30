@@ -1,4 +1,5 @@
-﻿using Discord.WebSocket;
+﻿using Discord;
+using Discord.WebSocket;
 using SunBot.Models.Enums;
 using System;
 using System.Collections.Generic;
@@ -10,7 +11,7 @@ namespace SunBot.Models
     public class BlackjackPlayer
     {
         public PlayerState State { get; set; }
-        public SocketUser User { get; set; }
+        public IUser User { get; set; }
         public List<Card> Cards { get; set; }
         public int Points 
         { 

@@ -18,39 +18,40 @@ namespace SunBot.Services
 {
     public class BlackjackService
     {
-        private List<Card> _dealerCards;
-        private List<int> _playingDeck;
-        private int _dealerPoints;
-        private int _cardsDrawnCount = 0;
-        private GameState _gameState = GameState.End;
-
-
-        // members
         private static int IMAGE_HEIGHT = 325;
         private static int IMAGE_WIDTH = 245;
         private static int PLAYER_CAPACITY = 6;
         private static string FACE_DOWN_CARD = "Resources/PNGCards/face_down.png";
+        
+        // In-game emojis
         private static Emoji HIT_EMOJI = new Emoji("👍");
         private static Emoji STAND_EMOJI = new Emoji("✋");
-        private static Emoji PLAY_AGAIN_EMOJI = new Emoji("✔️");
-        private static Emoji LEAVE_TABLE_EMOJI = new Emoji("❌");
 
+        // Menu emojis
+        private static Emoji START_EMOJI = new Emoji("✔️"); // Start/Play again
+        private static Emoji END_EMOJI = new Emoji("❌"); // End session
+        private static Emoji RETURN_EMOJI = new Emoji("🔙"); // return to session menu
+        private static Emoji JOIN_TABLE_EMOJI = new Emoji("⬆️");// Join table
+        private static Emoji LEAVE_TABLE_EMOJI = new Emoji("⬇️"); // Leave table
 
+        private List<Card> _dealerCards;
+        private List<int> _playingDeck;
+        private int _dealerPoints;
+        private int _cardsDrawnCount = 0;
+        private GameState _gameState = GameState.SessionEnded;
 
         private List<BlackjackPlayer> _players;
         private List<int> _initialDeck;
         private Configuration _config;
-        private DiscordSocketClient _client;
 
-        // Test
-        private RestUserMessage _theMessage;
+        private RestUserMessage _sessionMessage;
+
 
         public BlackjackService(Configuration config, DiscordSocketClient client)
         {
             _config = config;
-            _client = client;
 
-            client.ReactionAdded += React;
+            client.ReactionAdded += HandleReaction;
 
             _initialDeck = new List<int>();
             for (int i = 1; i < 53; i++)
@@ -64,102 +65,92 @@ namespace SunBot.Services
 
         #region Commands
 
-        public async void StartGameAsync()
+        public async void StartSession()
         {
-            if (_players.Count == 0)
-            {
-                await _config.DefaultTextChannel.SendMessageAsync("No players at the table!");
+            if (_gameState == GameState.SessionStarted)
                 return;
-            }
 
-            if (_gameState == GameState.Playing) // _playing
+            // Get menu embed
+            var embed = await GetMenuEmbedAsync();
+
+            if (_gameState == GameState.End)
             {
-                await _config.DefaultTextChannel.SendMessageAsync($"A game is currently in progress.");
-                return;
+                await _sessionMessage.DeleteAsync();
+                _sessionMessage = await _config.DefaultTextChannel.SendMessageAsync(embed: embed);
             }
-
-            _gameState = GameState.Playing;
-
-            ShuffleDeck();
-            await _config.DefaultTextChannel.SendMessageAsync("Deck shuffled, let's play some cards!");
-
-            // Reset players hands
-            foreach (var player in _players)
-            {
-                player.Cards = new List<Card>();
-                player.State = PlayerState.Playing;
-            }
-
-            // Reset dealer hand
-            _dealerCards = new List<Card>();
-
-            // Deal and show result
-            InitialDeal();
-            SendActionResult();
-        }
-
-        public async void JoinTable(SocketUser user)
-        {
-            // if game is already running, prevent join
-            if (_gameState == GameState.Playing)
-            {
-                await _config.DefaultTextChannel.SendMessageAsync("Can't join a game in progress.");
-                return;
-            }
-
-            // if player is already in game, prevent join
-            if (_players.Any(x => x.User == user))
-            {
-                await _config.DefaultTextChannel.SendMessageAsync("You already joined!");
-                return;
-            }
-
-
-            if (_players.Count == PLAYER_CAPACITY)
-                await _config.DefaultTextChannel.SendMessageAsync("No seats available! :(");
+            else if (_sessionMessage != null && _sessionMessage.Reference != null)
+                await _sessionMessage.ModifyAsync(x => x.Embed = embed);
             else
-            {
-                var newPlayer = new BlackjackPlayer
-                {
-                    State = PlayerState.Playing,
-                    User = user,
-                    Cards = new List<Card>()
-                };
-                _players.Add(newPlayer);
-                await _config.DefaultTextChannel.SendMessageAsync("Joined table!");
+                _sessionMessage = await _config.DefaultTextChannel.SendMessageAsync(embed: embed);
 
-                // Show players
-            }
-        }
+            _gameState = GameState.SessionStarted;
 
-        public async void LeaveTable(ulong userId)
-        {
-            if (_players.Any(x => x.User.Id == userId))
-            {
-                _players.RemoveAt(_players.FindIndex(x => x.User.Id == userId));
-                await _config.DefaultTextChannel.SendMessageAsync("Left table!");
-            }
-            else
-            {
-                await _config.DefaultTextChannel.SendMessageAsync("Not at the table.");
-            }
-        }
-
-        public async void ClearTable()
-        {
-            _players.Clear();
-            await _config.DefaultTextChannel.SendMessageAsync("Table cleared!");
-        }
-
-        public async void GetRules()
-        {
-            await _config.DefaultTextChannel.SendMessageAsync("[Rules here]");
+            // Add reactions
+            await _sessionMessage.AddReactionAsync(JOIN_TABLE_EMOJI);
+            await _sessionMessage.AddReactionAsync(LEAVE_TABLE_EMOJI);
+            await _sessionMessage.AddReactionAsync(START_EMOJI);
+            await _sessionMessage.AddReactionAsync(END_EMOJI);
         }
 
         #endregion
 
+        #region Menu actions
 
-        #region Player actions
+        private async void StartGame()
+        {
+            _gameState = GameState.Playing;
+
+            ResetGame();
+            InitialDeal();
+            Draw();
+        }
+
+        private async void EndSession()
+        {
+            await _sessionMessage.DeleteAsync();
+            _gameState = GameState.SessionEnded;
+
+            _players.Clear();
+
+            // reset other stuff
+        }
+
+        private async void JoinTable(IUser user)
+        {
+            if (_players.Count >= PLAYER_CAPACITY)
+                return;
+
+            if (_players.Any(x => x.User == user))
+                return;
+
+            // Add new player
+            var player = new BlackjackPlayer
+            {
+                State = PlayerState.Playing,
+                User = user,
+                Cards = new List<Card>(),
+            };
+            _players.Add(player);
+
+            // Modify session message
+            var embed = await GetMenuEmbedAsync();
+            await _sessionMessage.ModifyAsync(x => x.Embed = embed);
+        }
+
+        private async void LeaveTable(ulong userId)
+        {
+            if (_players.Any(x => x.User.Id == userId)) 
+            {
+                _players.RemoveAt(_players.FindIndex(x => x.User.Id == userId));
+
+                var embed = await GetMenuEmbedAsync();
+                await _sessionMessage.ModifyAsync(x => x.Embed = embed);
+            }
+        }
+
+        #endregion
+
+        #region Game actions
         private void Hit(BlackjackPlayer currentPlayer)
         {
             if (_gameState == GameState.End) // !_playing
@@ -189,7 +180,8 @@ namespace SunBot.Services
         #endregion
 
 
-        #region Update logic and result 
+        
+        #region Game logic & Draw method
 
         private void Update()
         {
@@ -217,7 +209,7 @@ namespace SunBot.Services
                 }
                 else
                 {
-                    SendActionResult();
+                    Draw();
                 }
             }
         }
@@ -225,15 +217,15 @@ namespace SunBot.Services
         private async void ProcessStand()
         {
             int highestPlayerScore = 0;
-            
+
             foreach (var player in _players)
             {
-                if (player.Points > highestPlayerScore && player.Points < 21) 
+                if (player.Points > highestPlayerScore && player.Points < 21)
                     highestPlayerScore = player.Points;
             }
 
             // Reveal down card
-            SendActionResult();
+            Draw();
             await Task.Delay(5000);
 
             while (_gameState == GameState.PlayerStand)
@@ -243,7 +235,7 @@ namespace SunBot.Services
                 if (_players.All(x => x.State == PlayerState.Bust))
                 {
                     _gameState = GameState.End;
-                    SendActionResult();
+                    Draw();
                 }
                 else if (_dealerPoints < 17 && _dealerPoints < highestPlayerScore)
                 {
@@ -252,7 +244,7 @@ namespace SunBot.Services
                     _dealerPoints = _dealerCards.Sum(x => x.Value);
 
                     // report progress to player
-                    SendActionResult();
+                    Draw();
 
                     // wait
                     await Task.Delay(5000);
@@ -260,98 +252,37 @@ namespace SunBot.Services
                 else // bust or satisfied with cards
                 {
                     _gameState = GameState.End;
-                    SendActionResult();
+                    Draw();
                 }
             }
         }
 
-        private async void SendActionResult()
+        private async void Draw()
         {
-            StringBuilder builder = new StringBuilder();
-
-            foreach (var player in _players)
-            {
-                builder.AppendLine($"{player.User.Mention}: {player.Points} | **{player.State}**");
-            }
-
-            builder.AppendLine(); // padding line
-
-            if (_gameState == GameState.End)
-            {
-                builder.AppendLine("**Results!**");
-
-                foreach (var player in _players)
-                {
-                    if (player.Points > 21) 
-                        builder.AppendLine($"{player.User.Mention} **Bust! House wins**");
-
-                    else if (_dealerPoints > 21) 
-                        builder.AppendLine($"{player.User.Mention} **Bust! You win**");
-
-                    else if (player.Points > _dealerPoints) 
-                        builder.AppendLine($"{player.User.Mention} **Your hand wins!**");
-
-                    else if (player.Points < _dealerPoints) 
-                        builder.AppendLine($"{player.User.Mention} **House hand wins!**");
-
-                    else if (player.Points == _dealerPoints) 
-                        builder.AppendLine($"{player.User.Mention} **Push! refunds galore!**");
-                }
-            }
-            else if (_gameState == GameState.PlayerStand)
-            {
-                builder.AppendLine("**Processing..**");
-            }
-            else
-            {
-                builder.AppendLine("**Hit or stand?**");
-            }
-
-            // Create embed
-            var embed = new EmbedBuilder
-            {
-                Title = "Testing!",
-                Description = $"{builder}",
-                ImageUrl = "attachment://myimage.png"
-            };
-            var footer = new EmbedFooterBuilder();
-
-            // Footer info
-            if (_gameState == GameState.End)
-            {
-                footer.Text = $"{PLAY_AGAIN_EMOJI} Play again! | {LEAVE_TABLE_EMOJI} Leave table.";
-            }
-            else if (_gameState == GameState.Playing)
-            {
-                footer.Text = $"{HIT_EMOJI} Hit! | {STAND_EMOJI} Stand.";
-            }
-            embed.Footer = footer;
-
-
+            var embed = await GetGameEmbedAsync();
             await using MemoryStream memoryStream = CreateCardImageMemoryStream();
 
-            if (_theMessage != null)
+            if (_sessionMessage != null)
             {
-                await _theMessage.DeleteAsync();
+                await _sessionMessage.DeleteAsync();
             }
-            _theMessage = await _config.DefaultTextChannel.SendFileAsync(memoryStream, "myimage.png", "", embed: embed.Build());
+            _sessionMessage = await _config.DefaultTextChannel.SendFileAsync(memoryStream, "myimage.png", "", embed: embed);
 
             // Add reactions
             if (_gameState == GameState.End)
             {
-                // play again, leave table
-                await _theMessage.AddReactionAsync(PLAY_AGAIN_EMOJI);
-                await _theMessage.AddReactionAsync(LEAVE_TABLE_EMOJI);
+                await _sessionMessage.AddReactionAsync(RETURN_EMOJI); // return to menu
+                await _sessionMessage.AddReactionAsync(START_EMOJI); // Play again
+                await _sessionMessage.AddReactionAsync(END_EMOJI); // End session
             }
             if (_gameState == GameState.Playing)
             {
-                await _theMessage.AddReactionAsync(HIT_EMOJI);
-                await _theMessage.AddReactionAsync(STAND_EMOJI);
+                await _sessionMessage.AddReactionAsync(HIT_EMOJI);
+                await _sessionMessage.AddReactionAsync(STAND_EMOJI);
             }
         }
 
         #endregion
-        
 
         #region Deck functions
 
@@ -370,12 +301,23 @@ namespace SunBot.Services
             _dealerPoints = _dealerCards.Sum(x => x.Value);
         }
 
-        private void ShuffleDeck()
+        private void ResetGame()
         {
+            // Reset and shuffle deck
             Random random = new Random();
             _playingDeck = new List<int>();
             _playingDeck = _initialDeck.OrderBy(x => random.Next()).ToList();
             _cardsDrawnCount = 0;
+
+            // Reset player hands
+            foreach (var player in _players)
+            {
+                player.Cards = new List<Card>();
+                player.State = PlayerState.Playing;
+            }
+
+            // Reset dealer hand
+            _dealerCards = new List<Card>();
         }
 
         private Card DrawCard()
@@ -396,6 +338,124 @@ namespace SunBot.Services
 
         #endregion
 
+
+        private async Task<Embed> GetMenuEmbedAsync()
+        {
+            var builder = new StringBuilder();
+            builder.AppendLine("**Blackjack** (With slightly modified rules!)");
+            builder.AppendLine();
+            builder.AppendLine("**Table rules**");
+            builder.AppendLine("When starting a new game i will deal 1 card to each player (face up) and 1 card to myself (face down).\n" +
+                               "You can then ask for more cards (**hit**) until you are satisfied with your hand (**stand**) or go over 21 (**bust**).\n" +
+                               "When all players have gone **bust** or choose to **stand** i will begin drawing cards in a attempt to beat your hand(s).");
+            builder.AppendLine();
+            builder.AppendLine("**Point values**");
+            builder.AppendLine("1    = Ace\n" +
+                               "10   = Face card (Jack, Queen, King)\n" +
+                               "2-10 = Numbered cards");
+            builder.AppendLine();
+            builder.AppendLine("**Win conditions**");
+            builder.AppendLine("If you go bust, the house wins! (even if i go bust trying to beat other players hands)\n" +
+                               "If i go bust, you win!\n" +
+                               "If your hand beats my hand, you win!\n" +
+                               "If my hand beats your hand, the house wins!");
+            builder.AppendLine();
+            builder.AppendLine("Have fun!");
+            builder.AppendLine();
+
+            builder.AppendLine($"**Table** (Player capacity: {PLAYER_CAPACITY})");
+
+            if (_players.Count == 0)
+                builder.AppendLine("No players at the table!");
+            else
+            {
+                foreach (var player in _players)
+                {
+                    builder.AppendLine($"{player.User.Mention}");
+                }
+            }
+
+            builder.AppendLine();
+
+            var footer = new EmbedFooterBuilder
+            {
+                Text = $"{JOIN_TABLE_EMOJI} Join Table | {LEAVE_TABLE_EMOJI} Leave table | {START_EMOJI} Start game | {END_EMOJI} End session"
+            };
+            var embed = new EmbedBuilder();
+            embed.Title = "Blackjack session";
+            embed.Description = builder.ToString();
+            embed.Color = Discord.Color.Gold;
+            embed.Footer = footer;
+
+            return embed.Build();
+        }
+
+        private async Task<Embed> GetGameEmbedAsync()
+        {
+            StringBuilder builder = new StringBuilder();
+
+            foreach (var player in _players)
+            {
+                builder.AppendLine($"{player.User.Mention}: {player.Points} | **{player.State}**");
+            }
+
+            builder.AppendLine(); // padding line
+
+            if (_gameState == GameState.End)
+            {
+                builder.AppendLine("**Results!**");
+
+                foreach (var player in _players)
+                {
+                    if (player.Points > 21)
+                        builder.AppendLine($"{player.User.Mention} **Bust! House wins**");
+
+                    else if (_dealerPoints > 21)
+                        builder.AppendLine($"{player.User.Mention} **Bust! You win**");
+
+                    else if (player.Points > _dealerPoints)
+                        builder.AppendLine($"{player.User.Mention} **Your hand wins!**");
+
+                    else if (player.Points < _dealerPoints)
+                        builder.AppendLine($"{player.User.Mention} **House hand wins!**");
+
+                    else if (player.Points == _dealerPoints)
+                        builder.AppendLine($"{player.User.Mention} **Push! refunds galore!**");
+                }
+            }
+            else if (_gameState == GameState.PlayerStand)
+            {
+                builder.AppendLine("**Processing..**");
+            }
+            else
+            {
+                builder.AppendLine("**Hit or stand?**");
+            }
+
+            // Create embed
+            var embed = new EmbedBuilder
+            {
+                Title = "Blackjack session",
+                Description = $"{builder}",
+                ImageUrl = "attachment://myimage.png",
+                Color = Discord.Color.Gold
+            };
+            var footer = new EmbedFooterBuilder();
+
+            // Footer info
+            if (_gameState == GameState.End)
+            {
+                footer.Text = $"{RETURN_EMOJI} Return to menu | {START_EMOJI} Play again | {END_EMOJI} End session";
+            }
+            else if (_gameState == GameState.Playing)
+            {
+                footer.Text = $"{HIT_EMOJI} Hit! | {STAND_EMOJI} Stand.";
+            }
+            embed.Footer = footer;
+
+
+            return embed.Build();
+        }
 
 
 
@@ -465,21 +525,42 @@ namespace SunBot.Services
             return memoryStream;
         }
 
-        // Testing
-        public async Task React(Cacheable<IUserMessage, ulong> cacheable, ISocketMessageChannel channel, SocketReaction reaction)
+        public async Task HandleReaction(Cacheable<IUserMessage, ulong> cacheable, ISocketMessageChannel channel, SocketReaction reaction)
         {
-            if (reaction.User.Value.IsBot) return;
-            else if (_players.Any(x => x.User.Id == reaction.User.Value.Id))
+            if (reaction.User.Value.IsBot)
+                return;
+            else if (cacheable.Id != _sessionMessage.Id)
+                return;
+            else if (_gameState == GameState.SessionStarted)
+            {
+                if (reaction.Emote.Name == START_EMOJI.Name)
+                    StartGame();
+                else if (reaction.Emote.Name == END_EMOJI.Name)
+                    EndSession();
+                else if (reaction.Emote.Name == JOIN_TABLE_EMOJI.Name)
+                    JoinTable(reaction.User.Value);
+                else if (reaction.Emote.Name == LEAVE_TABLE_EMOJI.Name)
+                    LeaveTable(reaction.User.Value.Id);
+            }
+            else if (_gameState == GameState.Playing &&
+                     _players.Any(x => x.User.Id == reaction.User.Value.Id))
             {
                 var player = _players.First(x => x.User.Id == reaction.User.Value.Id);
-                if (reaction.Emote.Name == HIT_EMOJI.Name) 
+
+                if (reaction.Emote.Name == HIT_EMOJI.Name)
                     Hit(player);
-                else if (reaction.Emote.Name == STAND_EMOJI.Name) 
+                else if (reaction.Emote.Name == STAND_EMOJI.Name)
                     Stand(player);
-                else if (reaction.Emote.Name == PLAY_AGAIN_EMOJI.Name) 
-                    StartGameAsync();
-                else if (reaction.Emote.Name == LEAVE_TABLE_EMOJI.Name) 
-                    LeaveTable(reaction.User.Value.Id);
+            }
+            else if (_gameState == GameState.End &&
+                     _players.Any(x => x.User.Id == reaction.User.Value.Id))
+            {
+                if (reaction.Emote.Name == RETURN_EMOJI.Name)
+                    StartSession();
+                else if (reaction.Emote.Name == START_EMOJI.Name)
+                    StartGame();
+                else if (reaction.Emote.Name == END_EMOJI.Name)
+                    EndSession();
             }
         }
     }

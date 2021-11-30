@@ -1,6 +1,7 @@
 ﻿using Discord.Commands;
 using SunBot.Models.Enums;
 using SunBot.Services;
+using System;
 using System.Threading.Tasks;
 
 namespace SunBot.Modules
@@ -10,31 +11,19 @@ namespace SunBot.Modules
         public BlackjackService Service { get; set; } 
 
         [Command("blackjack")]
-        [Summary("**Classic game of blackjack!** Somewhat modified rules for more interactivity!\n" +
-                 "use the command with one of the following 'actions'.\n\n" +
-                 "**start**: start game.\n" +
-                 "**join**: join table.\n" +
-                 "**leave**: leave table.\n" +
-                 "**clear**: remove all players from table.\n" +
-                 "**rules**: review the rules used in this implementation.")] // TODO: v fix this summary
-        public async Task BlackJackAsync([Summary("start/join/leave/clear/rules")]string action = "")
+        [Summary("Classic game of blackjack\n Use this command to start a blackjack session")] 
+        public async Task BlackJackAsync()
         {
-            if (action == "")
-            {
-                Service.StartSession();
-            }
+            Service.StartSession();
+        }
 
-            // old
-            //if (action == "start")
-            //    Service.StartGameAsync();
-            //else if (action == "join")
-            //    Service.JoinTable(Context.User);
-            //else if (action == "leave")
-            //    Service.LeaveTable(Context.User.Id);
-            //else if (action == "clear")
-            //    Service.ClearTable();
-            //else if (action == "rules")
-            //    Service.GetRules();
+        [Command("roll")]
+        [Summary("Roll a number 1-100\n" +
+                 "Provide a number to set the max value for the roll")]
+        public async Task RollAsync([Summary("5")]int max = 0)
+        {
+            Random random = new Random();
+            await ReplyAsync($"{random.Next(1, max == 0 ? 100 : max)}");
         }
     }
 }

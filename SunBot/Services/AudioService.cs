@@ -3,12 +3,17 @@ using Discord.Audio;
 using Discord.WebSocket;
 using NAudio.Wave;
 using SunBot.Models;
+using SunBot.Util;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using YoutubeExplode;
+using YoutubeExplode.Search;
+using YoutubeExplode.Videos;
 using YoutubeExplode.Videos.Streams;
 
 namespace SunBot.Services
@@ -54,7 +59,7 @@ namespace SunBot.Services
             await _audioClient.StopAsync();
         }
         
-        public async Task PlaySongAsync(IVoiceChannel voiceChannel, string songUrl = "")
+        public async Task PlaySongAsync(IVoiceChannel voiceChannel, string userInput = "")
         {
             if (_audioClient == null ||
                 _audioClient?.ConnectionState == ConnectionState.Disconnected)
@@ -66,16 +71,23 @@ namespace SunBot.Services
                     _audioClient?.ConnectionState == ConnectionState.Disconnecting) return;
             }
 
-            if (!string.IsNullOrEmpty(songUrl))
+            if (!string.IsNullOrEmpty(userInput))
             {
-                Song song = await GetHighestBitrateUrlAsync(songUrl);
-                _songQueue.Enqueue(song);
+                Song song = await YoutubeExplodeHelper.GetSongAsync(userInput);
+                var embed = new EmbedBuilder();
 
-                var embed = new EmbedBuilder
+                if (song != null)
                 {
-                    Description = $"Queued: [{song.Title}]({song.OriginalUrl})",
-                    Color = Color.Gold
-                };
+                    _songQueue.Enqueue(song);
+                    embed.Description = $"Queued: [{song.Title}]({song.OriginalUrl})";
+                    embed.Color = Color.Gold;
+                }
+                else
+                {
+                    embed.Description = $"Something went wrong :(";
+                    embed.Color = Color.Red;
+                }
+                
                 await _config.DefaultTextChannel.SendMessageAsync(embed: embed.Build());
             }
 
@@ -143,7 +155,9 @@ namespace SunBot.Services
                     builder.AppendLine($"{i + 1}. [{currentQueue[i].Title}]({currentQueue[i].OriginalUrl})");
                 }
 
-                embed.Description = builder.ToString();
+                //embed.Description = builder.ToString();
+                embed.AddField("queue", builder.ToString());
+                
                 embed.Color = Color.Gold;
             }
 
@@ -169,24 +183,6 @@ namespace SunBot.Services
             await _config.DefaultTextChannel.SendMessageAsync(embed: embed.Build());
         }
 
-        private async Task<Song> GetHighestBitrateUrlAsync(string songUrl)
-        {
-            var youtube = new YoutubeClient();
-            var video = await youtube.Videos.GetAsync(songUrl);
-
-            var streamManifest = await youtube.Videos.Streams.GetManifestAsync(video.Id);
-            var streamInfo = streamManifest.GetAudioOnlyStreams().GetWithHighestBitrate();
-
-            Song song = new Song
-            {
-                Title = video.Title,
-                AudioUrl = streamInfo.Url,
-                OriginalUrl = songUrl,
-            };
-                
-            return song;
-        }
-        
         private async Task ProcessQueueAsync()
         {
             while(_songQueue.Count > 0 && _playing)
@@ -237,6 +233,15 @@ namespace SunBot.Services
                 
                 _playing = false;
             }
+        }
+
+
+        public async Task FooAsync(string userInput)
+        {
+            var newQueue = await YoutubeExplodeHelper.GetPlaylistAsync(userInput);
+            _songQueue = newQueue;
+            _playing = true;
+            await ProcessQueueAsync();
         }
     }
 }

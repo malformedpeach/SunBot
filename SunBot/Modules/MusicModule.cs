@@ -70,11 +70,12 @@ namespace SunBot.Modules
         }
 
 
-        [Command("foo", RunMode = RunMode.Async)]
-        [Summary("Test command")]
-        public async Task FooAsync([Remainder]string userInput)
-        {
-            await Service.FooAsync(userInput);
-        }
+        //[Command("foo", RunMode = RunMode.Async)]
+        //[Summary("Test command")]
+        //public async Task FooAsync()
+        //{
+            
+        //    //await Service.FooAsync(userInput);
+        //}
     }
 }

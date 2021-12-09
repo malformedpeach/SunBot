@@ -38,51 +38,18 @@ namespace SunBot.Util
         public static async Task<Queue<Song>> GetSongQueueAsync(string userInput)
         {
             var queue = new Queue<Song>();
-            string playlistSearch = "";
-            
-            if (RegexHelper.IsYoutubeUrl(userInput))
-            {
-                playlistSearch = userInput;
-            }
-            else
-            {
-                var searchResult = await _youtube.Search
-                    .GetPlaylistsAsync(userInput)
-                    .FirstOrDefaultAsync();
+            var playlist = await GetPlaylistAsync(userInput);
 
-                playlistSearch = searchResult.Id;
-            }
+            if (playlist == null)
+                return null;
 
-            await foreach (var video in _youtube.Playlists.GetVideosAsync(playlistSearch))
+            await foreach (var video in _youtube.Playlists.GetVideosAsync(playlist.Id))
             {
                 var song = await GetSongAsync(video.Id);
                 queue.Enqueue(song);
             }
 
             return queue;
-
-            //var searchResult = await _youtube.Search
-            //    .GetPlaylistsAsync(userInput)
-            //    .FirstOrDefaultAsync();
-
-            //var videosSubset = await _youtube.Playlists
-            //    .GetVideosAsync(searchResult.Id)
-            //    .CollectAsync(20);
-
-            //foreach (var video in videosSubset)
-            //{
-            //    var song = await GetSongAsync(video.Id);
-            //    newQueue.Enqueue(song);
-            //}
-
-            //await foreach (var batch in _youtube.Playlists.GetVideoBatchesAsync(searchResult.Id)) 
-            //{
-            //    foreach (var video in batch.Items)
-            //    {
-            //        var song = await GetSongAsync(video.Id);
-            //        newQueue.Enqueue(song);
-            //    }
-            //}
         }
 
         // process queue helper, call method when song gets dequeued for playback
@@ -115,25 +82,24 @@ namespace SunBot.Util
             return video;
         }
 
-        //private static async Task<Playlist> GetPlaylistAsync(string userInput)
-        //{
-        //    Playlist playlist = null;
+        private static async Task<Playlist> GetPlaylistAsync(string userInput)
+        {
+            Playlist playlist = null;
 
-        //    if (RegexHelper.IsYoutubeUrl(userInput))
-        //    {
-        //        playlist = await _youtube.Playlists.GetAsync(userInput);
-        //    }
-        //    else // search term
-        //    {
-        //        var searchResult = await _youtube.Search
-        //            .GetPlaylistsAsync(userInput)
-        //            .FirstOrDefaultAsync();
+            if (RegexHelper.IsYoutubeUrl(userInput))
+            {
+                playlist = await _youtube.Playlists.GetAsync(userInput);
+            }
+            else
+            {
+                var searchResult = await _youtube.Search
+                    .GetPlaylistsAsync(userInput)
+                    .FirstOrDefaultAsync();
 
-        //        if (searchResult != null)
-        //            playlist = await _youtube.Playlists.GetAsync(searchResult.Id);
-        //    }
+                playlist = await _youtube.Playlists.GetAsync(searchResult.Id);
+            }
 
-        //    return playlist;
-        //}
+            return playlist;
+        }
     }
 }

@@ -42,6 +42,7 @@ namespace SunBot.Services
         {
             client.GuildAvailable += InitializeDefaultChannel;
             client.UserJoined += AnnounceUserJoined;
+            client.SetGameAsync($"{Bot.Prefix}help");
         }
 
 

@@ -111,8 +111,8 @@ namespace SunBot.Services
                     Description = "This might take a while depending on playlist size.",
                     Color = Color.Gold
                 };
-                _config.DefaultTextChannel.SendMessageAsync(embed: embed.Build());
-
+                await _config.DefaultTextChannel.SendMessageAsync(embed: embed.Build());
+                 
                 var newQueue = await YoutubeExplodeHelper.GetSongQueueAsync(userInput);
                 _songQueue = newQueue;
                 _playing = true;
@@ -127,7 +127,7 @@ namespace SunBot.Services
                     Description = "Something went wrong :(",
                     Color = Color.Red
                 };
-                _config.DefaultTextChannel.SendMessageAsync(embed: embed.Build());
+                await _config.DefaultTextChannel.SendMessageAsync(embed: embed.Build());
             }
         }
 

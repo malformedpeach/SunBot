@@ -52,7 +52,6 @@ namespace SunBot.Util
             return queue;
         }
 
-        // process queue helper, call method when song gets dequeued for playback
         public static async Task<IStreamInfo> GetAudioStreamWithHighestBitrate(string url)
         {
             var streamManifest = await _youtube.Videos.Streams.GetManifestAsync(url);

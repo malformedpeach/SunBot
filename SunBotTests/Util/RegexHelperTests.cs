@@ -34,5 +34,18 @@ namespace SunBotTests.Util
             // Assert
             Assert.IsTrue(result);
         }
+
+        [TestMethod]
+        public void IsYoutubeUrlTest_PlaylistUrl()
+        {
+            // Arrange
+            string userInput = "https://www.youtube.com/playlist?list=PLMC9KNkIncKtPzgY-5rmhvj7fax8fdxoj";
+
+            // Act
+            var result = RegexHelper.IsYoutubeUrl(userInput);
+
+            // Assert
+            Assert.IsTrue(result);
+        }
     }
 }

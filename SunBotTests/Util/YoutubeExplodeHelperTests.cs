@@ -26,7 +26,7 @@ namespace SunBotTests.Util
             // Act
             var task = Task.Run(() => YoutubeExplodeHelper.GetSongAsync(userInput));
             task.Wait();
-            
+
             var actual = task.Result;
 
             // Assert

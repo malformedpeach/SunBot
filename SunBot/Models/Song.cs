@@ -9,7 +9,6 @@ namespace SunBot.Models
     {
         public VideoId Id { get; set; }
         public string Title { get; set; }
-        public string AudioUrl { get; set; }
-        public string OriginalUrl { get; set; }
+        public string Url { get; set; }
     }
 }

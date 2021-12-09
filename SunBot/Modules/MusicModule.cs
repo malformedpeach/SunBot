@@ -33,6 +33,14 @@ namespace SunBot.Modules
             await Service.PlaySongAsync(voiceChannel, userInput);
         }
 
+        [Command("playlist", RunMode = RunMode.Async)]
+        [Summary("Plays/Enqueues a playlist")]
+        public async Task PlaylistAsync([Summary("playlist url / search term")][Remainder] string userInput)
+        {
+            var voiceChannel = (Context.User as IGuildUser)?.VoiceChannel;
+            await Service.PlaySongQueueAsync(voiceChannel, userInput);
+        }
+
         [Command("stop", RunMode = RunMode.Async)]
         [Summary("Stops playback of queue")]
         public async Task StopAsync()

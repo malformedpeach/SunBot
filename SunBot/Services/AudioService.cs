@@ -1,20 +1,13 @@
 ﻿using Discord;
 using Discord.Audio;
-using Discord.WebSocket;
 using NAudio.Wave;
 using SunBot.Models;
 using SunBot.Util;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using YoutubeExplode;
-using YoutubeExplode.Search;
-using YoutubeExplode.Videos;
-using YoutubeExplode.Videos.Streams;
 
 namespace SunBot.Services
 {
@@ -79,7 +72,7 @@ namespace SunBot.Services
                 if (song != null)
                 {
                     _songQueue.Enqueue(song);
-                    embed.Description = $"Queued: [{song.Title}]({song.OriginalUrl})";
+                    embed.Description = $"Queued: [{song.Title}]({song.Url})";
                     embed.Color = Color.Gold;
                 }
                 else
@@ -96,6 +89,27 @@ namespace SunBot.Services
                 _playing = true;
                 await ProcessQueueAsync();
             }
+        }
+
+        // figure out a better name
+        public async Task PlaySongQueueAsync(IVoiceChannel voiceChannel, string userInput)
+        {
+            // Todo, embeds and stuff, mby refactor some stuff in YoutubeExplodeHelper.GetSongQueueAsync()
+
+            if (_audioClient == null ||
+                _audioClient?.ConnectionState == ConnectionState.Disconnected)
+            {
+                await JoinVoiceChannelAsync(voiceChannel);
+
+                if (_audioClient == null ||
+                    _audioClient?.ConnectionState == ConnectionState.Disconnected ||
+                    _audioClient?.ConnectionState == ConnectionState.Disconnecting) return;
+            }
+
+            var newQueue = await YoutubeExplodeHelper.GetSongQueueAsync(userInput);
+            _songQueue = newQueue;
+            _playing = true;
+            await ProcessQueueAsync();
         }
 
         public async Task StopSongAsync()
@@ -122,7 +136,7 @@ namespace SunBot.Services
             {
                 var embed = new EmbedBuilder
                 {
-                    Description = $"Skipping: [{_currentSong.Title}]({_currentSong.OriginalUrl})",
+                    Description = $"Skipping: [{_currentSong.Title}]({_currentSong.Url})",
                     Color = Color.Red
                 };
                 await _config.DefaultTextChannel.SendMessageAsync(embed: embed.Build());
@@ -142,22 +156,32 @@ namespace SunBot.Services
             }
             else
             {
-                var builder = new StringBuilder();
+                // 1024 field maxcap
+                var builder = new StringBuilder(1024); // Set maxcap 1024/2048 and create new when next song is going over
                 var currentQueue = _songQueue.ToArray();
                 
                 if(_playing)
                 {
-                    builder.AppendLine($"Currently playing: [{_currentSong.Title}]({_currentSong.OriginalUrl})");
+                    builder.AppendLine($"Currently playing: [{_currentSong.Title}]({_currentSong.Url})");
                 }
 
                 for (int i = 0; i < currentQueue.Length; i++)
                 {
-                    builder.AppendLine($"{i + 1}. [{currentQueue[i].Title}]({currentQueue[i].OriginalUrl})");
+                    string songLine = $"{i + 1}. [{currentQueue[i].Title}]({currentQueue[i].Url})";
+                    
+                    if (songLine.Length + builder.Length > builder.Capacity)
+                    {
+                        embed.AddField("foo", builder.ToString());
+                        builder.Clear();
+                        builder.AppendLine(songLine);
+                    }
+                    else
+                    {
+                        builder.AppendLine(songLine);
+                    }
                 }
 
-                //embed.Description = builder.ToString();
-                embed.AddField("queue", builder.ToString());
-                
+                embed.AddField("foo", builder.ToString()); // builder.ToString();
                 embed.Color = Color.Gold;
             }
 
@@ -190,21 +214,18 @@ namespace SunBot.Services
                 _tokenSource = new CancellationTokenSource();
                 var cancellationToken = _tokenSource.Token;
 
-                var dequeueSuccess = _songQueue.TryDequeue(out _currentSong);
-                if (!dequeueSuccess) 
-                {
-                    Console.WriteLine("ProcessQueueAsync: Error when dequeuing song");
-                    return;
-                }
-
-                await using var mediaReader = new MediaFoundationReader(_currentSong.AudioUrl);
+                _currentSong = _songQueue.Dequeue();
+                var streamInfo = await YoutubeExplodeHelper
+                    .GetAudioStreamWithHighestBitrate(_currentSong.Url);
+                
+                await using var mediaReader = new MediaFoundationReader(streamInfo.Url);
                 await using var outputStream = _audioClient.CreatePCMStream(AudioApplication.Music);
 
                 try
                 {
                     var embed = new EmbedBuilder
                     {
-                        Description = $"Now playing: [{_currentSong.Title}]({_currentSong.OriginalUrl})",
+                        Description = $"Now playing: [{_currentSong.Title}]({_currentSong.Url})",
                         Color = Color.Gold
                     };
                     await _config.DefaultTextChannel.SendMessageAsync(embed: embed.Build());
@@ -238,7 +259,7 @@ namespace SunBot.Services
 
         public async Task FooAsync(string userInput)
         {
-            var newQueue = await YoutubeExplodeHelper.GetPlaylistAsync(userInput);
+            var newQueue = await YoutubeExplodeHelper.GetSongQueueAsync(userInput);
             _songQueue = newQueue;
             _playing = true;
             await ProcessQueueAsync();

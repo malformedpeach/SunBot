@@ -48,6 +48,9 @@ namespace SunBot.Services
 
         private Task InitializeDefaultChannel(SocketGuild guild)
         {
+            if (DefaultTextChannel != null)
+                return Task.CompletedTask;
+
             DefaultTextChannel = guild.TextChannels.FirstOrDefault(x => x.Id == Bot.DefaultTextChannelId);
             if (DefaultTextChannel == null) DefaultTextChannel = guild.DefaultChannel;
 

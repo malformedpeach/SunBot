@@ -68,14 +68,5 @@ namespace SunBot.Modules
         {
             await Service.ClearQueueAsync();
         }
-
-
-        //[Command("foo", RunMode = RunMode.Async)]
-        //[Summary("Test command")]
-        //public async Task FooAsync()
-        //{
-            
-        //    //await Service.FooAsync(userInput);
-        //}
     }
 }

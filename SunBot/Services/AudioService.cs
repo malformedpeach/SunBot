@@ -5,6 +5,7 @@ using SunBot.Models;
 using SunBot.Util;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -164,6 +165,7 @@ namespace SunBot.Services
             }
         }
 
+        // TODO: refactor this method, show total count for queue and only show 10 next songs
         public async Task GetCurrentQueue()
         {
             var embed = new EmbedBuilder();
@@ -176,12 +178,14 @@ namespace SunBot.Services
             else
             {
                 var builder = new StringBuilder(1024);
-                var currentQueue = _songQueue.ToArray();
+                var currentQueue = _songQueue.Take(10).ToArray();
                 
                 if(_playing)
                 {
-                    embed.Description = $"Currently playing: [{_currentSong.Title}]({_currentSong.Url})";
+                    embed.Description = $"Now playing: [{_currentSong.Title}]({_currentSong.Url})";
                 }
+
+                embed.AddField($"Songs in queue:", _songQueue.Count.ToString());
 
                 for (int i = 0; i < currentQueue.Length; i++)
                 {
@@ -242,7 +246,13 @@ namespace SunBot.Services
                 _currentSong = _songQueue.Dequeue();
                 var streamInfo = await YoutubeExplodeHelper
                     .GetAudioStreamWithHighestBitrate(_currentSong.Url);
-                
+
+                if(streamInfo == null)
+                {
+                    await _config.DefaultTextChannel.SendMessageAsync("No 'Opus' encoded audio track found.");
+                    return;
+                }
+
                 await using var mediaReader = new MediaFoundationReader(streamInfo.Url);
                 await using var outputStream = _audioClient.CreatePCMStream(AudioApplication.Music);
 

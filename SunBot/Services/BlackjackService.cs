@@ -31,7 +31,7 @@ namespace SunBot.Services
         private static Emoji START_EMOJI = new Emoji("✔️"); // Start/Play again
         private static Emoji END_EMOJI = new Emoji("❌"); // End session
         private static Emoji RETURN_EMOJI = new Emoji("🔙"); // return to session menu
-        private static Emoji JOIN_TABLE_EMOJI = new Emoji("⬆️");// Join table
+        private static Emoji JOIN_TABLE_EMOJI = new Emoji("⬆️"); // Join table
         private static Emoji LEAVE_TABLE_EMOJI = new Emoji("⬇️"); // Leave table
 
         private List<Card> _dealerCards;
@@ -179,8 +179,6 @@ namespace SunBot.Services
 
         #endregion
 
-
-        
         #region Game logic & Draw method
 
         private void Update()

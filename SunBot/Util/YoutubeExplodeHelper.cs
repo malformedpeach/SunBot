@@ -55,7 +55,12 @@ namespace SunBot.Util
         public static async Task<IStreamInfo> GetAudioStreamWithHighestBitrate(string url)
         {
             var streamManifest = await _youtube.Videos.Streams.GetManifestAsync(url);
-            var streamInfo = streamManifest.GetAudioOnlyStreams().GetWithHighestBitrate();
+
+            var streamInfo = streamManifest.GetAudioOnlyStreams().Where(x => x.AudioCodec == "opus").TryGetWithHighestBitrate();
+
+            //if (streamInfo == null)
+            //    streamInfo = streamManifest.GetAudioOnlyStreams().GetWithHighestBitrate();
+
             return streamInfo;
         }
         
